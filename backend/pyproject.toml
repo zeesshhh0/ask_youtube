@@ -1,0 +1,25 @@
+[project]
+name = "explainium-backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "aiosqlite>=0.21.0",
+    "chromadb>=1.1.1",
+    "crewai>=0.130.0",
+    "fastapi>=0.115.9",
+    "greenlet>=3.3.0",
+    "langchain>=0.3.27",
+    "langchain-community>=0.3.31",
+    "langchain-google-genai>=2.1.12",
+    "langchain-tavily>=0.2.15",
+    "langgraph>=0.6.10",
+    "langgraph-checkpoint-sqlite>=3.0.2",
+    "sqlmodel>=0.0.31",
+    "structlog>=25.4.0",
+    "supadata>=1.2.1",
+    "typing-extensions>=4.14.0",
+    "uvicorn>=0.34.3",
+    "youtube-transcript-api>=1.2.2",
+]
