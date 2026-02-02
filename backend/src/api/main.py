@@ -20,7 +20,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(debug=True, lifespan=lifespan)
 
 origins = [
-   "https://explainium.vercel.app"
+#    "https://explainium.vercel.app",
+   "*"
 ]
 
 app.add_middleware(

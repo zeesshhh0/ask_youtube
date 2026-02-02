@@ -132,7 +132,13 @@ async def chat_message(thread_id: str, message: MessageRequest, request: Request
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
-@router.get("/{thread_id}/messages")
+@router.get("/threads")
+async def get_threads(session: AsyncSession = Depends(get_db)):
+    result = await session.exec(select(Thread))
+    return result.all()
+
+
+@router.get("/{thread_id}/history")
 async def get_messages(thread_id: str, request: Request):
     graph = request.app.state.graph
     config = {"configurable": {"thread_id": thread_id}}
