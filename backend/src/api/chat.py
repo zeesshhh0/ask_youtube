@@ -7,8 +7,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.core.database import get_db
 from src.core.models import YTVideo, Thread
 from src.common.youtube_tools import YouTubeTools
-from src.common.services import chroma_client, embeddings, llm
+from src.common.services import chroma_client, embeddings, llm, vector_store
 from langchain_classic.text_splitter import RecursiveCharacterTextSplitter
+from langchain_classic.chains.combine_documents.map_reduce import  MapReduceDocumentsChain
 from langchain_core.documents import Document
 from uuid import uuid4
 import json
@@ -26,8 +27,8 @@ class MessageRequest(BaseModel):
     content: str
     video_id: str 
 
-@router.post("/init")
-async def init_chat(request: InitRequest, session: AsyncSession = Depends(get_db)):
+@router.post("/threads")
+async def init_threads(request: InitRequest, session: AsyncSession = Depends(get_db)):
     try:
         video_id = YouTubeTools.get_youtube_video_id(request.youtube_url)
         if not video_id:
@@ -38,38 +39,65 @@ async def init_chat(request: InitRequest, session: AsyncSession = Depends(get_db
         video = result.first()
 
         if not video:
-            # Video processing logic
             video_info = YouTubeTools.get_video_data(request.youtube_url)
-            transcript = await YouTubeTools.get_video_captions(request.youtube_url)
+            transcript = await YouTubeTools.get_video_timestamps(request.youtube_url)
             
             if not transcript or transcript.startswith("No captions"):
                     raise HTTPException(status_code=404, detail="No transcript available for this video")
 
-            # Generate Summary
-            summary_prompt = f"Summarize the following transcript in 5 bullet points:\n\n{transcript}"
-            summary_response = await llm.ainvoke(summary_prompt)
-            summary = summary_response.content
+            parent_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200)
+            child_splitter = RecursiveCharacterTextSplitter(chunk_size=200, chunk_overlap=50)
 
-            # Store in ChromaDB
-            collection = chroma_client.get_or_create_collection(name=f"video_{video_id}")
-            
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-            chunks = text_splitter.split_text(transcript)
-            documents = [Document(page_content=chunk, metadata={"video_id": video_id, "chunk_index": i}) for i, chunk in enumerate(chunks)]
-            
-            if documents:
-                ids = [f"{video_id}_chunk_{i}" for i in range(len(documents))]
-                texts = [doc.page_content for doc in documents]
-                metadatas = [doc.metadata for doc in documents]
+            parent_docs = parent_splitter.create_documents([transcript])
+
+            ids = []
+            metadatas = []
+            texts = []
+            chapter_summaries_list = []
+
+            for p_index, parent_doc in enumerate(parent_docs):
                 
-                print("Generating embeddings...")
+                chapter_prompt = f"Summarize this specific video section in 2 sentences:\n\n{parent_doc.page_content}"
+                chapter_summary_res = await llm.ainvoke(chapter_prompt)
+                chapter_context = chapter_summary_res.content
+
+                chapter_summaries_list.append(chapter_context)
+
+                child_chunks = child_splitter.split_text(parent_doc.page_content)
+
+                for c_index, chunk_text in enumerate(child_chunks):
+                    
+                    doc_id = f"{video_id}_P{p_index}_C{c_index}"                    
+                    ids.append(doc_id)
+                    texts.append(chunk_text)
+                    
+                    metadatas.append({
+                        "video_id": video_id,
+                        "chunk_index": c_index,
+                        "parent_id": p_index,
+                        "chapter_summary": chapter_context,  
+                    })
+                
+                combined_summaries = "\n- ".join(chapter_summaries_list)
+
+                global_summary_prompt = f"""
+                Here is an outline of a video based on its chapter summaries:
+
+                - {combined_summaries}
+
+                Task: Write a concise 5 Sentence Global Summary of the entire video based on this outline.
+                """
+
+                global_summary_res = await llm.ainvoke(global_summary_prompt)
+                video_global_summary = global_summary_res.content
+                
                 docs_embeddings = embeddings.embed_documents(texts)
-                
-                collection.add(
+
+                vector_store.add_texts(
                     ids=ids,
-                    documents=texts,
-                    embeddings=docs_embeddings, # type: ignore
-                    metadatas=metadatas # type: ignore
+                    texts=texts,
+                    embeddings=docs_embeddings,
+                    metadatas=metadatas
                 )
 
             # Insert into DB
@@ -80,7 +108,7 @@ async def init_chat(request: InitRequest, session: AsyncSession = Depends(get_db
                 author_name=video_info.get('author_name'), 
                 thumbnail_url=video_info.get('thumbnail_url'), 
                 transcript=transcript, 
-                summary=summary # type: ignore
+                summary=video_global_summary # type: ignore
             )
             session.add(video)
             await session.commit()

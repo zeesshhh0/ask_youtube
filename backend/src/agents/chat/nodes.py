@@ -27,7 +27,7 @@ def retrieve_context(state: RAGState, config: RunnableConfig) -> dict:
         
         results = collection.query(
             query_embeddings=[query_embedding],
-            n_results=5
+            n_results=5, 
         )
         
         docs = results.get("documents", [])

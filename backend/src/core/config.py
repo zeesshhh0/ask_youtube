@@ -84,7 +84,9 @@ class Settings:
 
         # RAG Configuration
         self.CHROMA_DB_PATH = os.getenv("CHROMA_DB_PATH", "./.chroma")
+        self.RETRIVER_STORE_PATH = os.getenv("RETRIVER_STORE_PATH", "./.retriever_store")
         self.FAST_LLM_MODEL = os.getenv("FAST_LLM_MODEL", "gemini-2.5-flash")
+        self.FASTEST_LLM_MODEL = os.getenv("FASTEST_LLM_MODEL", "gemini-2.5-flash-lite")
         self.SMART_LLM_MODEL = os.getenv("SMART_LLM_MODEL", "gemini-2.5-pro")
         self.EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
         self.CHECKPOINT_DB_PATH = os.getenv("CHECKPOINT_DB_PATH", "checkpoints.db")

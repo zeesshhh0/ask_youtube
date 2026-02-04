@@ -91,7 +91,7 @@ export function ChatContainer({
       try {
         await handleSSEStream(
           apiClient.chat.getMessageStreamUrl(thread.thread_id),
-          content,
+          { content, video_id: thread.video_id },
           {
             onToken: (token) => {
               aiContent += token;

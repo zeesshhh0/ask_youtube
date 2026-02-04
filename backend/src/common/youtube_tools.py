@@ -193,7 +193,7 @@ class YouTubeTools:
             raise HTTPException(status_code=500, detail=f"Error getting captions for video: {str(e)}")
 
     @staticmethod
-    async def get_video_timestamps(url: str, languages: Optional[List[str]] = None) -> List[str]:
+    async def get_video_timestamps(url: str, languages: Optional[List[str]] = None) -> str:
         """Generate timestamps for a YouTube video based on captions using the new API."""
         print(f"[{datetime.now()}] get_video_timestamps called with URL: {url}, languages: {languages}")
 
@@ -234,6 +234,7 @@ class YouTubeTools:
                     print(f"[{datetime.now()}] Sample timestamp [{i}]: {timestamp}")
 
             print(f"[{datetime.now()}] Generated {len(timestamps)} timestamps")
+            timestamps = ", ".join(timestamps)
             return timestamps
         except Exception as e:
             print(f"[{datetime.now()}] ERROR: Exception while generating timestamps: {str(e)}")

@@ -1,0 +1,3 @@
+- [ ] fix the guardrails around youtube video check if it exists or not
+- [ ] see the fallback of transcript of video
+- [ ] see the multi lang thing of transcript of video (first priority should be en)

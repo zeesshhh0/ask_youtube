@@ -15,7 +15,7 @@ export interface StreamCallbacks {
  */
 export async function handleSSEStream(
   url: string,
-  content: string,
+  payload: { content: string; video_id: string },
   callbacks: StreamCallbacks,
   signal?: AbortSignal
 ): Promise<void> {
@@ -28,7 +28,7 @@ export async function handleSSEStream(
         "Content-Type": "application/json",
         Accept: "text/event-stream",
       },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify(payload),
       signal,
     });
 
