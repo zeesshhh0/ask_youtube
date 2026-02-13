@@ -13,10 +13,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 from src.core.database import init_db
-from src.common.youtube_tools import YouTubeTools
+# from src.common.youtube_tools import YouTubeTools
 from src.api.chat import InitRequest, init_threads
 from src.agents.chat.graph import workflow
-from src.agents.prompts import ask_youtube_agent_system_prompt
+from src.agents.chat_agent import YTAgentState, YoutubeVideo, agent
+from langchain.messages import HumanMessage
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.common.services import vector_store
 from src.core.database import engine
@@ -36,7 +37,7 @@ async def run_test():
         # Using a short, stable video for testing: "Google Search - 60s" or similar
         # Let's use a known safe URL. 
         # Example: "Me at the zoo" - the first youtube video (short) -> https://www.youtube.com/watch?v=jNQXAC9IVRw
-        test_url = "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+        test_url = "https://www.youtube.com/watch?v=U_zWBOV_bng"
         
         logger.info(f"Testing init_chat with URL: {test_url}")
         request = InitRequest(youtube_url=test_url)
@@ -47,8 +48,7 @@ async def run_test():
             print(init_result)
             
             logger.info("✅ init_chat passed")
-
-            return
+            return 
         except Exception as e:
             logger.error(f"❌ init_chat failed: {e}")
             import traceback
@@ -87,8 +87,27 @@ async def run_test():
             traceback.print_exc()
 
 async def test():
-       
-    print(ask_youtube_agent_system_prompt.format_messages(full_video_summaries = "ehells", retrieved_chunks= 'slkdfj', question= 'hello'))
+    question = "what are names of the people in this video?"
+    video1 = YoutubeVideo(
+        video_id="U_zWBOV_bng",
+        title="Ro Khanna reveals 6 redacted names in the Epstein files on the House floor",
+        summary="Congressmen Massie and the Speaker visited the DOJ regarding unredacted Epstein files, discovering significant redactions and the subsequent revelation of previously hidden powerful men only after their inquiry. This review exposed a disturbing pattern of file redactions allegedly protecting wealthy individuals involved with Jeffrey Epstein's island and abuse. The Speaker questions the lack of elite accountability in the US compared to other nations, highlighting a potential two-tiered justice system. The video emphasizes that billionaires who participated in or ignored underage rape on Epstein's island may escape consequences. Ultimately, the video calls for urgent investigations and prosecutions to ensure accountability and restore equitable justice for all."
+        )
+    
+    input: YTAgentState = YTAgentState(
+        messages=[
+            HumanMessage(content= question)
+            ],
+        videos=[video1]
+        )
+    
+    result = agent.invoke(
+        input=input,
+        config={"configurable": {"thread_id": "U_1zWBOV_bng4311"}},
+
+    )
+    print(result)
+    return
 
 if __name__ == "__main__":
 
