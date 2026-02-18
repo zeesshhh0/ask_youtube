@@ -1,9 +1,8 @@
 ## 1. Project Overview
 
-**Name:** Explainium  
-**Type:** Educational Chatbot for YouTube Videos  
-**Goal:** Create a "Chat with Video" interface where users can ask questions about educational YouTube content. The system processes video transcripts using RAG (Retrieval-Augmented Generation) and generates educational questions.  
-**Status:** Proof of Concept (PoC)  
+**Name:** Ask Youtube  
+**Type:** Chatbot for YouTube Videos  
+**Goal:** Create a "Chat with Video" interface where users can ask questions about YouTube content.
 **Priority:**
 
 1. Chat with Video (RAG Pipeline) - **Primary Focus**
@@ -20,14 +19,15 @@
 
 ### LangGraph & LangChain
 
-- **Orchestration:** LangGraph 1.0+ (`langgraph`)
-  - `StateGraph` - Graph-based workflow orchestration
-  - `MessagesState` - Built-in state for chat workflows
+- **Orchestration:** Direct Agent (`langchain.agents`)
+  - `create_agent` - Direct agent creation
+  - `AgentState` - State management for agent
   - `AsyncSqliteSaver` - Async checkpointing for state persistence
 - **LLM Framework:** LangChain (`langchain-classic`, `langchain-google-genai`)
 - **LLM Provider:** Google Gemini (via `langchain-google-genai`)
   - Fast LLM: `gemini-2.5-flash` (for speed)
   - Smart LLM: `gemini-2.5-pro` (for complex reasoning)
+- **Observability:** LangSmith (for prompt management and tracing)
 
 ### Vector Database & Embeddings
 
@@ -37,7 +37,7 @@
 ### Database & Persistence
 
 - **Application Database:** SQLite (`aiosqlite` for async operations)
-- **Checkpointing:** LangGraph `AsyncSqliteSaver`
+- **Checkpointing:** LangGraph `AsyncSqliteSaver` (SQLite)
 - **Architecture:** Dual-database approach (see Database Architecture section)
 
 ### External APIs
@@ -50,11 +50,11 @@
 
 **Rationale:** Separate concerns between LangGraph state management and application data.
 
-#### Database 1: `checkpoints.db` (LangGraph State)
+#### Database 1: `checkpoints.db` (Agent State)
 
-- **Purpose:** Store conversation checkpoints, thread states, and graph execution history
-- **Managed by:** `AsyncSqliteSaver` (LangGraph manages schema internally)
-- **Tables:** Auto-managed by LangGraph
+- **Purpose:** Store conversation checkpoints, thread states, and agent execution history
+- **Managed by:** `AsyncSqliteSaver` (LangChain manages schema internally)
+- **Tables:** Auto-managed by checkpointer
   - `checkpoints` - Stores state snapshots
   - `checkpoint_writes` - Stores pending writes
 - **Usage:** Thread continuity, state recovery, conversation resumption
@@ -68,11 +68,11 @@
 #### Connection Pattern
 
 ```python
-# Checkpoint database (LangGraph)
+# Checkpoint database (Agent)
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 checkpointer = AsyncSqliteSaver.from_conn_string("checkpoints.db")
-graph = workflow.compile(checkpointer=checkpointer)
+# checkpointer is passed to create_agent during initialization
 
 # Application database (FastAPI/SQLAlchemy)
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -191,67 +191,54 @@ results = collection.query(
 
 ---
 
-## 6. LangGraph State Management
+## 6. Agent State Management
 
-### State Definition Patterns
+### State Definition (YTAgentState)
 
-#### Pattern 1: Built-in `MessagesState` (Chat Workflow)
-
-Use for chat-based workflows with message history:
+The agent uses a typed state definition to manage context:
 
 ```python
-from langgraph.graph import StateGraph, MessagesState, START, END
-from langchain_core.messages import HumanMessage, AIMessage
+class YoutubeVideo(TypedDict):
+    video_id: str
+    title: str
+    summary: str
 
-def chat_node(state: MessagesState):
-    messages = state['messages']
-    # Process messages...
-    response = llm.invoke(messages)
-    return {'messages': [response]}
-
-workflow = StateGraph(MessagesState)
-workflow.add_node('chat', chat_node)
-workflow.add_edge(START, 'chat')
-workflow.add_edge('chat', END)
-
-graph = workflow.compile(checkpointer=checkpointer)
+class YTAgentState(AgentState):
+    videos: List[YoutubeVideo]
 ```
 
-### State Reducers (Advanced)
+### Middleware (`inject_video_summaries`)
 
-For complex state updates, use annotated reducers:
+A dynamic prompt middleware injects active video summaries into the system prompt:
 
 ```python
-from typing import Annotated
-from operator import add
-
-class RAGState(TypedDict):
-    messages: Annotated[list, add]      # Append to list
-    context: str                         # Replace value
-    sources: Annotated[list, add]       # Append to list
-
-# When node returns:
-# {'messages': [new_msg]} -> appends to state['messages']
-# {'context': new_context} -> replaces state['context']
+@dynamic_prompt
+def inject_video_summaries(request: ModelRequest) -> str:
+    # Fetches active videos from state
+    # Formats them into the system prompt
+    # Returns updated prompt
 ```
 
 ---
 
-## 7. LangGraph Checkpointing & Threads
+## 7. Agent Checkpointing
 
 ### Checkpointing Setup
 
 ```python
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-from langgraph.graph import StateGraph
+from langchain.agents import create_agent
 
-async def create_graph():
-    # Create checkpointer (async context manager)
-    async with AsyncSqliteSaver.from_conn_string("checkpoints.db") as checkpointer:
-        workflow = StateGraph(MessagesState)
-        # Add nodes and edges...
-        graph = workflow.compile(checkpointer=checkpointer)
-        return graph
+# Initialize agent with checkpointer
+async with AsyncSqliteSaver.from_conn_string("checkpoints.db") as checkpointer:
+    agent = create_agent(
+        model=llm,
+        tools=[retrieve_context],
+        middleware=[inject_video_summaries],
+        state_schema=YTAgentState,
+        checkpointer=checkpointer,
+        debug=True
+    )
 ```
 
 ### Thread Management
@@ -284,293 +271,144 @@ response2 = await graph.ainvoke(
 
 ---
 
-## 8. Workflows (LangGraph)
+## 8. Workflow (Direct Agent)
 
-### Workflow A: Chat with Video (RAG Pipeline) - **Priority 1**
+### Agent Logic
 
-**Trigger:** User sends a message via `POST /chat/{thread_id}/message`  
-**State Type:** `MessagesState`  
-**Streaming:** Yes (using `.astream()`)
+**Trigger:** User sends a message via `POST /chat/{thread_id}/message`
+**System Prompt:** Pulled from LangSmith (`ask_youtube_agent_system_prompt`)
 
-#### Graph Structure
+#### Execution Flow
 
-```
-START → retrieve_context → generate_response → END
-                ↓ (conditional)
-         context_summarizer (if context too large)
-```
+1.  **Input:** User message received.
+2.  **Middleware:** `inject_video_summaries` updates the system prompt with context about active videos (title, summary).
+3.  **LLM Processing:** The LLM decides whether to answer directly or use tools.
+4.  **Tool Execution:** If needed, the agent calls `retrieve_context`.
+5.  **Response:** The agent generates the final response.
 
-#### Nodes
+#### Tools
 
-1. **`retrieve_context`** (RAG Retrieval)
-   - **Input:** `state['messages']` (latest user message)
-   - **Process:**
-     - Extract user query from last message
-     - Generate embedding using Gemini
-     - Query ChromaDB for top 5 relevant chunks
-     - Retrieve chat history from `messages` table (last 10 messages)
-   - **Output:** Update state with `context` key (retrieved chunks)
-
-2. **`generate_response`** (LLM Generation)
-   - **Input:** `state['messages']` + `state['context']`
-   - **Process:**
-     - Construct prompt: `[System] + [Context] + [History] + [Query]`
-     - Stream response from Gemini LLM
-     - Persist user message and AI response to `messages` table
-   - **Output:** Append AIMessage to `state['messages']`
-
-3. **`context_summarizer`** (Conditional - Future Enhancement)
-   - **Trigger:** If conversation exceeds token limit
-   - **Process:** Summarize older messages to compress context
-   - **Output:** Replace older messages with summary
-
-#### Conditional Edge Logic
-
-```python
-def should_summarize(state: MessagesState) -> str:
-    # Calculate approximate token count
-    total_tokens = estimate_tokens(state['messages'])
-    if total_tokens > 8000:
-        return "summarize"
-    return "generate"
-
-workflow.add_conditional_edges(
-    "retrieve_context",
-    should_summarize,
-    {
-        "summarize": "context_summarizer",
-        "generate": "generate_response"
-    }
-)
-```
+1.  **`retrieve_context`**
+    - **Purpose:** Search video transcripts for specific details.
+    - **Input:** Query string.
+    - **Process:**
+      - Extracts video IDs from state (`videos`).
+      - Performs similarity search in `vector_store` (ChromaDB) filtering by valid video IDs.
+      - Groups results by video and chapter.
+      - Formats the output with timestamps and transcripts.
+    - **Output:** Serialized context string + retrieved documents (for metadata).
 
 ---
 
 ## 9. API Endpoints
 
-### Video Initialization
+### Thread Management
 
-#### `POST /chat/init`
+#### `POST /api/v1/threads`
 
-Initialize a new chat thread for a YouTube video.
+Initialize chat, ingest YouTube video.
 
 **Request:**
 
 ```json
 {
-  "youtube_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+  "video_url": "https://www.youtube.com/watch?v=..."
 }
 ```
-
-**Process:**
-
-1. Extract video ID from URL
-2. Check if video exists in `yt_video` table
-3. If not exists:
-   - Fetch transcript using `YouTubeTranscriptApi`
-   - Fetch metadata using YouTube oEmbed API
-   - Generate summary using Gemini
-   - Chunk transcript using `RecursiveCharacterTextSplitter`
-   - Generate embeddings and store in ChromaDB
-   - Save to `yt_video` table
-4. Create new thread in `threads` table
 
 **Response:**
 
 ```json
 {
   "thread_id": "uuid-here",
-  "video_id": "dQw4w9WgXcQ",
-  "title": "Never Gonna Give You Up",
-  "summary": "AI-generated summary..."
+  "title": "Video Title",
+  "summary": "Video summary..."
 }
 ```
 
----
+#### `GET /api/v1/threads`
+
+List all user conversations (paginated).
+
+**Response:**
+
+```json
+[
+  {
+    "thread_id": "6e0e092e-94f5-49cd-9202-8b43106f015a",
+    "created_at": "2026-01-31T11:02:43.793765",
+    "title": "dfsdfsfdsa"
+  }
+]
+```
+
+#### `DELETE /api/v1/threads/{id}`
+
+Delete a conversation.
 
 ### Chat Interaction
 
-#### `POST /chat/{thread_id}/message` (Streaming)
+#### `POST /api/v1/threads/{id}/messages`
 
-Send a message and receive streaming response.
+Send a user question.
 
 **Request:**
 
 ```json
 {
-  "content": "What are the main arguments presented?"
+  "thread_id": "id",
+  "content": "User question here"
 }
 ```
 
-**Process:**
+#### `GET /api/v1/threads/{id}/messages`
 
-1. Retrieve thread from `threads` table
-2. Validate thread exists and get `video_id`
-3. Save user message to `messages` table
-4. Run LangGraph RAG workflow with streaming
-5. Stream response chunks as Server-Sent Events (SSE)
-6. Save final AI response to `messages` table
-
-**Response (SSE Stream):**
-
-```
-event: message
-data: {"type": "token", "content": "The"}
-
-event: message
-data: {"type": "token", "content": " main"}
-
-event: message
-data: {"type": "token", "content": " arguments"}
-
-event: message
-data: {"type": "sources", "chunks": [{"chunk_id": "...", "score": 0.85}]}
-
-event: message
-data: {"type": "end", "message_id": 123}
-```
-
-**Streaming Implementation:**
-
-```python
-from fastapi.responses import StreamingResponse
-
-@router.post("/{thread_id}/message")
-async def send_message(thread_id: str, message: MessageRequest):
-    async def event_generator():
-        config = {"configurable": {"thread_id": thread_id}}
-
-        async for event in graph.astream(
-            {'messages': [HumanMessage(message.content)]},
-            config=config,
-            stream_mode="values"  # or "updates" for delta streaming
-        ):
-            if 'messages' in event:
-                chunk = event['messages'][-1].content
-                yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
-
-        yield f"data: {json.dumps({'type': 'end'})}\n\n"
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
-```
-
----
-
-### Thread Management
-
-#### `GET /chat/{thread_id}/history`
-
-Retrieve message history for UI rendering.
+Get chat history.
 
 **Response:**
 
 ```json
 {
-  "thread_id": "uuid-here",
-  "video_id": "dQw4w9WgXcQ",
+  "thread_id": "id",
   "messages": [
     {
-      "message_id": 1,
-      "sender": "user",
-      "content": "What is this video about?",
-      "created_at": "2024-01-27T10:00:00Z"
-    },
-    {
-      "message_id": 2,
-      "sender": "ai",
-      "content": "This video discusses...",
-      "created_at": "2024-01-27T10:00:05Z"
+      "message_id": 123,
+      "role": "human",
+      "content": "Hello",
+      "metadata": {}
     }
   ]
 }
 ```
 
-#### `DELETE /chat/{thread_id}`
-
-Delete a thread and its messages.
-
-**Process:**
-
-1. Delete from `messages` table (CASCADE)
-2. Delete from `threads` table
-3. Optionally: Prune checkpoints from `checkpoints.db`
-
 ---
 
-## 10. LangGraph Best Practices
+## 10. Agent Best Practices
 
-### Node Design Principles
+### Tool Design Principles
 
-1. **Pure Functions:** Nodes should be deterministic given the same state
-2. **Single Responsibility:** Each node handles one task
-3. **State Updates:** Return dict with only fields to update
-4. **Error Handling:** Use try/except and return error state
-
-```python
-def safe_node(state: MyState) -> dict:
-    try:
-        result = process(state['input'])
-        return {'output': result, 'error': None}
-    except Exception as e:
-        return {'error': str(e)}
-```
+1.  **Clear Docstrings:** Essential for the LLM to understand when to use the tool.
+2.  **Typed Arguments:** Use type hints for tool arguments.
+3.  **Context Awareness:** Tools access `runtime.state` to get context (like active videos).
 
 ### Debugging
 
 ```python
-# Enable debug mode for detailed logs
-graph = workflow.compile(checkpointer=checkpointer, debug=True)
-
-# Inspect state at checkpoints
-checkpoints = await checkpointer.alist(config)
-for checkpoint in checkpoints:
-    print(checkpoint.state)
+# Enable debug mode on agent creation
+agent = create_agent(..., debug=True)
 ```
 
-### Testing Workflows
+### Prompt Management
 
-```python
-import pytest
-from langgraph.graph import StateGraph
-
-def test_chat_workflow():
-    # Create graph without checkpointer for testing
-    workflow = StateGraph(MessagesState)
-    # ... add nodes ...
-    graph = workflow.compile()
-
-    # Test invocation
-    result = graph.invoke({'messages': [HumanMessage("test")]})
-    assert len(result['messages']) == 2  # User + AI message
-```
-
-### State Validation
-
-```python
-from pydantic import BaseModel, validator
-
-class ValidatedState(BaseModel):
-    transcript_text: str
-    summary_text: str = ""
-
-    @validator('transcript_text')
-    def validate_transcript(cls, v):
-        if len(v) < 100:
-            raise ValueError("Transcript too short")
-        return v
-
-# Use in nodes
-def node(state: dict) -> dict:
-    validated = ValidatedState(**state)
-    # Process validated state...
-```
+- Use **LangSmith** to manage and version system prompts.
+- Use middleware (`@dynamic_prompt`) for dynamic context injection.
 
 ---
 
 ## 11. Project Structure
 
 ```
-explainium_backend/
+backend/
 ├── src/
 │   ├── agents/
 │   ├── api/

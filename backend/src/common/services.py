@@ -21,6 +21,6 @@ llm = ChatGoogleGenerativeAI(
 
 vector_store = Chroma(
     client=chroma_client,
-    collection_name="youtube_videos",
+    collection_name=settings.CHROMA_COLLECTION_NAME,
     embedding_function=embeddings
 )

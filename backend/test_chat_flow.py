@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 from src.core.database import init_db
 # from src.common.youtube_tools import YouTubeTools
 from src.api.chat import InitRequest, init_threads
-from src.agents.chat.graph import workflow
 from src.agents.chat_agent import YTAgentState, YoutubeVideo, agent
 from langchain.messages import HumanMessage
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -87,7 +86,7 @@ async def run_test():
             traceback.print_exc()
 
 async def test():
-    question = "what are names of the people in this video?"
+    question = "names taken in the video"
     video1 = YoutubeVideo(
         video_id="U_zWBOV_bng",
         title="Ro Khanna reveals 6 redacted names in the Epstein files on the House floor",
@@ -102,8 +101,8 @@ async def test():
         )
     
     result = agent.invoke(
-        input=input,
-        config={"configurable": {"thread_id": "U_1zWBOV_bng4311"}},
+        input= input, # type: ignore
+        config={"configurable": {"thread_id": "U_1zWBOV_bn43113"}},
 
     )
     print(result)

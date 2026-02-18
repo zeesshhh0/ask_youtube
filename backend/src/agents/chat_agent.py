@@ -1,4 +1,3 @@
-from dataclasses import dataclass, field
 from typing import Dict, List, TypedDict
 from langchain.tools import tool
 from langchain.agents import create_agent
@@ -11,10 +10,10 @@ from langchain_classic.prompts import BaseChatPromptTemplate
 from collections import defaultdict
 
 
-client = Client()
-ask_youtube_agent_system_prompt:BaseChatPromptTemplate = client.pull_prompt(
+langsmith_client = Client()
+ask_youtube_agent_system_prompt : BaseChatPromptTemplate = langsmith_client.pull_prompt(
     "ask_youtube_agent_system_prompt",
-)
+) 
 
 class YoutubeVideo(TypedDict):
     video_id: str
@@ -39,9 +38,8 @@ def inject_video_summaries(request: ModelRequest) -> str:
     
     for id, vid in enumerate(active_videos):
         # Get summary or fallback text
-        video_context_str += f"- **Video - {id+1}: {vid['title']}**: {vid['summary']}\n"
+        video_context_str += f"- **Video** - Video Number: {id+1}\n Video Title: {vid['title']}\n Video Summary: {vid['summary']}\n"
     
-    print(base_prompt + video_context_str)    
     return base_prompt + video_context_str
 
 
@@ -75,9 +73,9 @@ def retrieve_context(query: str, runtime: ToolRuntime[YTAgentState]):
     for vid, chapters in grouped_docs.items():
         serialized_parts.append(f"### Video ID: {vid}")
         for chapter_summary, chunks in chapters.items():
-            serialized_parts.append(f"**Chapter Context:** {chapter_summary}")
+            serialized_parts.append(f"**Chapter Context:** {chapter_summary} \n Here are some transcripts with timestamps:")
             for chunk in chunks:
-                serialized_parts.append(f"- \"{chunk}\"")
+                serialized_parts.append(f"- {chunk}")
         serialized_parts.append("---")
 
     serialized = "\n".join(serialized_parts)
@@ -85,11 +83,9 @@ def retrieve_context(query: str, runtime: ToolRuntime[YTAgentState]):
     return serialized, retrieved_docs
 
 
-tools = [retrieve_context]
-
 agent = create_agent(
     model=llm,
-    tools=tools,
+    tools=[retrieve_context],
     middleware=[inject_video_summaries],
     state_schema=YTAgentState,
     checkpointer=InMemorySaver(),
