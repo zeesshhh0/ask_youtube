@@ -112,7 +112,7 @@ components/
 
 2. User enters YouTube URL and submits
    ├─> Show loading state (skeleton + progress message)
-   ├─> Call POST /api/chat/init
+   ├─> Call POST /api/v1/threads
    └─> Backend processes:
        ├─> Fetch transcript
        ├─> Generate embeddings
@@ -136,7 +136,7 @@ components/
 
 ```
 1. User on /chat/[threadId]
-   ├─> Load chat history from GET /api/chat/{threadId}/history
+   ├─> Load chat history from GET /api/v1/threads/{threadId}/messages
    ├─> Display messages with proper sender attribution
    └─> Auto-scroll to latest message
 
@@ -144,7 +144,7 @@ components/
    ├─> Disable input (prevent double-submit)
    ├─> Add user message to UI immediately
    ├─> Show typing indicator
-   └─> Call POST /api/chat/{threadId}/message (SSE)
+   └─> Call POST /api/v1/threads/{threadId}/messages (SSE stream)
 
 3. Stream AI response
    ├─> Append tokens to message bubble in real-time
@@ -183,7 +183,7 @@ components/
 
 4. Delete thread (future)
    ├─> Show confirmation dialog
-   ├─> Call DELETE /api/chat/{threadId}
+   ├─> Call DELETE /api/v1/threads/{threadId}
    ├─> Remove from sidebar
    └─> Redirect to /chat if active
 ```
@@ -250,7 +250,7 @@ const {
   reload, // Retry last message
   stop, // Stop streaming
 } = useChat({
-  api: `/api/chat/${threadId}/message`,
+  api: `/api/v1/threads/${threadId}/messages`,
   streamMode: "text",
   onFinish: (message) => {
     // Save to history, update UI
@@ -265,92 +265,310 @@ const {
 
 ## 6. API Integration Layer
 
+> **Base URL:** `http://localhost:8000/api/v1` (configured via `NEXT_PUBLIC_API_URL`)
+
+### Endpoints Reference
+
+| Method   | Path                            | Description                             |
+| -------- | ------------------------------- | --------------------------------------- |
+| `POST`   | `/threads`                      | Create thread & ingest YouTube video    |
+| `GET`    | `/threads`                      | List all threads                        |
+| `DELETE` | `/threads/{thread_id}`          | Delete a thread and its messages        |
+| `POST`   | `/threads/{thread_id}/messages` | Send a message — **returns SSE stream** |
+| `GET`    | `/threads/{thread_id}/messages` | Get full message history                |
+
+---
+
+### Request & Response Schemas
+
+#### `POST /threads` — Create Thread
+
+**Request body:**
+
+```json
+{ "video_url": "https://www.youtube.com/watch?v=..." }
+```
+
+**Response:**
+
+```json
+{
+  "thread_id": "uuid-here",
+  "video_id": "dQw4w9WgXcQ",
+  "title": "Video Title",
+  "summary": "AI-generated global summary..."
+}
+```
+
+#### `GET /threads` — List Threads
+
+**Response:**
+
+```json
+[
+  {
+    "thread_id": "6e0e092e-94f5-49cd-9202-8b43106f015a",
+    "title": "Video Title",
+    "video_id": "dQw4w9WgXcQ",
+    "created_at": "2026-01-31T11:02:43.793765"
+  }
+]
+```
+
+#### `DELETE /threads/{thread_id}` — Delete Thread
+
+**Response:**
+
+```json
+{ "success": true, "thread_id": "uuid-here" }
+```
+
+#### `POST /threads/{thread_id}/messages` — Send Message (SSE)
+
+**Request body:**
+
+```json
+{ "content": "What is this video about?" }
+```
+
+**Response:** `Content-Type: text/event-stream` — see [SSE Streaming](#sse-streaming) below.
+
+#### `GET /threads/{thread_id}/messages` — Get History
+
+**Response:**
+
+```json
+{
+  "thread_id": "uuid-here",
+  "messages": [
+    {
+      "message_id": 0,
+      "role": "human",
+      "content": "What is this video about?",
+      "metadata": null,
+      "created_at": "2026-01-31T11:02:43.793765"
+    },
+    {
+      "message_id": 1,
+      "role": "ai",
+      "content": "This video covers...",
+      "metadata": { "model": "gemini-2.5-flash" },
+      "created_at": "2026-01-31T11:02:45.123456"
+    }
+  ]
+}
+```
+
+> **Note:** `role` is `"human"` or `"ai"` (not `"user"`). `message_id` is the 0-based index of the message in the LangGraph state, not a DB primary key.
+
+---
+
+### SSE Streaming
+
+The `POST /threads/{thread_id}/messages` endpoint streams the AI response as [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events). Each event is a JSON-encoded object on the `data:` field.
+
+#### SSE Event Types
+
+| `type`  | When emitted               | Payload fields    |
+| ------- | -------------------------- | ----------------- |
+| `token` | For every LLM output chunk | `content: string` |
+| `end`   | After the last token       | _(none)_          |
+
+**Wire format example:**
+
+```
+data: {"type": "token", "content": "This "}
+
+data: {"type": "token", "content": "video "}
+
+data: {"type": "token", "content": "covers..."}
+
+data: {"type": "end"}
+
+```
+
+> **Important:** `EventSource` does not support `POST` requests natively. Use `fetch` with `ReadableStream` to consume the SSE response from a POST body.
+
+---
+
 ### Base API Client
 
 ```typescript
 // lib/api/client.ts
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const BASE = `${API_BASE_URL}/api/v1`;
 
 export const apiClient = {
-  chat: {
-    init: async (youtubeUrl: string) => {
-      const res = await fetch(`${API_BASE_URL}/chat/init`, {
+  threads: {
+    /** POST /threads — ingest a YouTube video and create a thread */
+    create: async (videoUrl: string) => {
+      const res = await fetch(`${BASE}/threads`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ youtube_url: youtubeUrl }),
+        body: JSON.stringify({ video_url: videoUrl }),
       });
       if (!res.ok) throw new Error("Failed to initialize chat");
-      return res.json();
+      return res.json() as Promise<CreateThreadResponse>;
     },
 
-    getHistory: async (threadId: string) => {
-      const res = await fetch(`${API_BASE_URL}/chat/${threadId}/history`);
-      if (!res.ok) throw new Error("Failed to fetch history");
-      return res.json();
+    /** GET /threads — list all threads */
+    list: async () => {
+      const res = await fetch(`${BASE}/threads`);
+      if (!res.ok) throw new Error("Failed to fetch threads");
+      return res.json() as Promise<ThreadListItem[]>;
     },
 
-    sendMessage: (threadId: string, content: string) => {
-      // Returns EventSource for SSE streaming
-      return new EventSource(`${API_BASE_URL}/chat/${threadId}/message`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
-      });
-    },
-
-    deleteThread: async (threadId: string) => {
-      const res = await fetch(`${API_BASE_URL}/chat/${threadId}`, {
+    /** DELETE /threads/{thread_id} */
+    delete: async (threadId: string) => {
+      const res = await fetch(`${BASE}/threads/${threadId}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Failed to delete thread");
-      return res.json();
+      return res.json() as Promise<DeleteThreadResponse>;
     },
+
+    /** GET /threads/{thread_id}/messages — full history */
+    getMessages: async (threadId: string) => {
+      const res = await fetch(`${BASE}/threads/${threadId}/messages`);
+      if (!res.ok) throw new Error("Failed to fetch history");
+      return res.json() as Promise<ThreadMessagesResponse>;
+    },
+
+    /**
+     * POST /threads/{thread_id}/messages — send a message.
+     * Returns a raw Response whose body is an SSE stream.
+     * Use handleSSEStream() to consume it.
+     */
+    sendMessage: (threadId: string, content: string) =>
+      fetch(`${BASE}/threads/${threadId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      }),
   },
 };
 ```
 
+### TypeScript Types (matching backend schemas)
+
+```typescript
+// lib/api/types.ts
+
+export interface CreateThreadResponse {
+  thread_id: string;
+  video_id: string;
+  title: string | null;
+  summary: string | null;
+}
+
+export interface ThreadListItem {
+  thread_id: string;
+  title: string | null;
+  video_id: string;
+  created_at: string; // ISO 8601
+}
+
+export interface MessageResponse {
+  message_id: number; // 0-based index in LangGraph state
+  role: "human" | "ai";
+  content: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string; // ISO 8601
+}
+
+export interface ThreadMessagesResponse {
+  thread_id: string;
+  messages: MessageResponse[];
+}
+
+export interface DeleteThreadResponse {
+  success: boolean;
+  thread_id: string;
+}
+
+// SSE event shapes (data field of each SSE event)
+export type SSEEvent =
+  | { type: "token"; content: string } // partial AI response chunk
+  | { type: "end" }; // stream finished
+```
+
 ### SSE Stream Handler
+
+> **Why `fetch` instead of `EventSource`?**  
+> The native `EventSource` API only supports `GET` requests. Since the message endpoint is `POST`, we use `fetch` with a `ReadableStream` reader to consume the SSE response.
 
 ```typescript
 // lib/api/streamHandler.ts
+
+import type { SSEEvent } from "./types";
+
+/**
+ * Sends a message to the backend and streams the AI response via SSE.
+ *
+ * @param threadId  - The active thread ID
+ * @param content   - The user's message text
+ * @param onToken   - Called for each streamed token chunk
+ * @param onComplete - Called when the stream ends (type: "end" received)
+ * @param onError   - Called on network or parse errors
+ * @returns Cleanup function that aborts the fetch if called
+ */
 export function handleSSEStream(
   threadId: string,
   content: string,
   onToken: (token: string) => void,
-  onComplete: (messageId: number) => void,
+  onComplete: () => void,
   onError: (error: Error) => void,
-) {
-  const eventSource = new EventSource(
-    `/api/chat/${threadId}/message?content=${encodeURIComponent(content)}`,
-  );
+): () => void {
+  const controller = new AbortController();
 
-  eventSource.addEventListener("message", (event) => {
-    const data = JSON.parse(event.data);
+  (async () => {
+    try {
+      const res = await fetch(`/api/v1/threads/${threadId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+        signal: controller.signal,
+      });
 
-    switch (data.type) {
-      case "token":
-        onToken(data.content);
-        break;
-      case "sources":
-        // Handle source citations
-        break;
-      case "end":
-        onComplete(data.message_id);
-        eventSource.close();
-        break;
-      case "error":
-        onError(new Error(data.message));
-        eventSource.close();
-        break;
+      if (!res.ok || !res.body) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+
+      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += value;
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? ""; // keep incomplete line
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const json = line.slice(6).trim();
+          if (!json) continue;
+
+          const event: SSEEvent = JSON.parse(json);
+
+          if (event.type === "token") {
+            onToken(event.content);
+          } else if (event.type === "end") {
+            onComplete();
+            return;
+          }
+        }
+      }
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        onError(err instanceof Error ? err : new Error(String(err)));
+      }
     }
-  });
+  })();
 
-  eventSource.onerror = (error) => {
-    onError(new Error("Stream connection failed"));
-    eventSource.close();
-  };
-
-  return () => eventSource.close(); // Cleanup function
+  return () => controller.abort(); // cleanup / cancel stream
 }
 ```
 

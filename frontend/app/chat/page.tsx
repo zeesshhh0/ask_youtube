@@ -23,9 +23,9 @@ export default function NewChatPage() {
       setError(null);
 
       try {
-        const response = await apiClient.chat.init(url);
+        // POST /api/v1/threads — ingest video and create thread
+        const response = await apiClient.threads.create(url);
 
-        // Create thread object
         const thread: Thread = {
           thread_id: response.thread_id,
           video_id: response.video_id,
@@ -34,7 +34,6 @@ export default function NewChatPage() {
           created_at: new Date().toISOString(),
         };
 
-        // Add to global state
         addThread(thread);
         setActiveThread(response.thread_id);
 

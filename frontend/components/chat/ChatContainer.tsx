@@ -37,8 +37,15 @@ export function ChatContainer({
 
     async function loadHistory() {
       try {
-        const response = await apiClient.chat.getHistory(thread.thread_id);
-        const historyMessages = response.messages || [];
+        const response = await apiClient.threads.getMessages(thread.thread_id);
+        // Map backend role ("human"/"ai") to UI sender ("user"/"ai")
+        const historyMessages = (response.messages || []).map((m) => ({
+          message_id: m.message_id,
+          sender: (m.role === "human" ? "user" : "ai") as "user" | "ai",
+          content: m.content,
+          metadata: m.metadata ?? undefined,
+          created_at: m.created_at,
+        }));
         setMessages(historyMessages);
         messageIdRef.current = Math.max(
           ...historyMessages.map((m) => m.message_id),
@@ -90,20 +97,16 @@ export function ChatContainer({
 
       try {
         await handleSSEStream(
-          apiClient.chat.getMessageStreamUrl(thread.thread_id),
-          { content, video_id: thread.video_id },
+          apiClient.threads.getMessageStreamUrl(thread.thread_id),
+          { content },
           {
             onToken: (token) => {
               aiContent += token;
               setStreamingContent(aiContent);
             },
-            onSources: (sources) => {
-              console.log("Sources:", sources);
-            },
-            onComplete: (serverMessageId) => {
-              // Add the complete AI message
+            onComplete: () => {
               const aiMessage: Message = {
-                message_id: serverMessageId || aiMessageId,
+                message_id: aiMessageId,
                 sender: "ai",
                 content: aiContent,
                 created_at: new Date().toISOString(),
@@ -144,7 +147,7 @@ export function ChatContainer({
 
   return (
     <div className="flex flex-col h-full">
-      <ChatHeader title={thread.title} videoId={thread.video_id} />
+      <ChatHeader title={thread.title ?? undefined} videoId={thread.video_id} />
 
       <ChatMessages
         messages={displayMessages}

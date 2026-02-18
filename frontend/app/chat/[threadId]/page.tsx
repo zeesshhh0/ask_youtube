@@ -23,22 +23,28 @@ export default function ThreadPage() {
   useEffect(() => {
     setActiveThread(threadId);
 
-    // Check if thread exists in context
+    // Check if thread already exists in context (just navigated from new-chat flow)
     const existingThread = threads.find((t) => t.thread_id === threadId);
 
     if (existingThread) {
       setThread(existingThread);
-      // Still need to load messages
       loadMessages();
     } else {
-      // Load thread and messages from API
       loadThreadData();
     }
 
     async function loadMessages() {
       try {
-        const response = await apiClient.chat.getHistory(threadId);
-        setMessages(response.messages || []);
+        // GET /api/v1/threads/{threadId}/messages
+        const response = await apiClient.threads.getMessages(threadId);
+        const mapped: Message[] = (response.messages || []).map((m) => ({
+          message_id: m.message_id,
+          sender: (m.role === "human" ? "user" : "ai") as "user" | "ai",
+          content: m.content,
+          metadata: m.metadata ?? undefined,
+          created_at: m.created_at,
+        }));
+        setMessages(mapped);
       } catch (error) {
         toast.error(getErrorMessage(error));
       } finally {
@@ -48,23 +54,31 @@ export default function ThreadPage() {
 
     async function loadThreadData() {
       try {
-        const response = await apiClient.chat.getHistory(threadId);
+        // GET /api/v1/threads/{threadId}/messages — history also gives us thread context
+        const response = await apiClient.threads.getMessages(threadId);
 
-        // Create thread from history response
+        // Build a minimal Thread from the messages response
         const threadData: Thread = {
           thread_id: response.thread_id,
-          video_id: response.video_id,
-          title: `Video ${response.video_id}`, // May need to get title from another source
-          summary: "",
+          video_id: "", // not returned by messages endpoint; sidebar will have full data
+          title: null,
+          summary: null,
           created_at: response.messages[0]?.created_at || new Date().toISOString(),
         };
 
         setThread(threadData);
-        setMessages(response.messages || []);
+
+        const mapped: Message[] = (response.messages || []).map((m) => ({
+          message_id: m.message_id,
+          sender: (m.role === "human" ? "user" : "ai") as "user" | "ai",
+          content: m.content,
+          metadata: m.metadata ?? undefined,
+          created_at: m.created_at,
+        }));
+        setMessages(mapped);
         addThread(threadData);
       } catch (error) {
         toast.error(getErrorMessage(error));
-        // Redirect back to chat if thread not found
         router.push("/chat");
       } finally {
         setIsLoading(false);
@@ -72,9 +86,10 @@ export default function ThreadPage() {
     }
 
     return () => {
-      // Cleanup - could stop streaming here if needed
+      // Cleanup (e.g., abort streaming) can be added here
     };
-  }, [threadId, threads, setActiveThread, addThread, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadId]);
 
   if (isLoading) {
     return (

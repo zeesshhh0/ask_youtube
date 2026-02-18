@@ -2,24 +2,27 @@ import type { StreamEvent } from "@/lib/types";
 
 export interface StreamCallbacks {
   onToken: (token: string) => void;
-  onSources?: (
-    chunks: Array<{ text: string; start_time?: number; end_time?: number }>
-  ) => void;
-  onComplete: (messageId: number) => void;
+  onComplete: () => void;
   onError: (error: Error) => void;
 }
 
 /**
- * Handle SSE stream from the chat API
- * Uses fetch with ReadableStream for better control
+ * Sends a message to POST /api/v1/threads/{threadId}/messages and streams
+ * the AI response via SSE using fetch + ReadableStream.
+ *
+ * The backend emits two event types:
+ *   { type: "token", content: string }  — partial AI response chunk
+ *   { type: "end" }                     — stream finished
+ *
+ * NOTE: EventSource is NOT used because it only supports GET requests.
  */
 export async function handleSSEStream(
   url: string,
-  payload: { content: string; video_id: string },
+  payload: { content: string },
   callbacks: StreamCallbacks,
   signal?: AbortSignal
 ): Promise<void> {
-  const { onToken, onSources, onComplete, onError } = callbacks;
+  const { onToken, onComplete, onError } = callbacks;
 
   try {
     const response = await fetch(url, {
@@ -46,57 +49,43 @@ export async function handleSSEStream(
 
     while (true) {
       const { done, value } = await reader.read();
-
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
 
-      // Process complete SSE events
+      // Split on newlines; keep the last (potentially incomplete) line in buffer
       const lines = buffer.split("\n");
-      buffer = lines.pop() || ""; // Keep incomplete line in buffer
+      buffer = lines.pop() || "";
 
       for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const jsonStr = line.slice(6);
-          if (jsonStr === "[DONE]") {
-            continue;
-          }
+        if (!line.startsWith("data: ")) continue;
 
-          try {
-            const event: StreamEvent = JSON.parse(jsonStr);
+        const jsonStr = line.slice(6).trim();
+        if (!jsonStr || jsonStr === "[DONE]") continue;
 
-            switch (event.type) {
-              case "token":
-                onToken(event.content);
-                break;
-              case "sources":
-                onSources?.(event.chunks);
-                break;
-              case "end":
-                onComplete(event.message_id);
-                return;
-              case "error":
-                onError(new Error(event.message));
-                return;
-            }
-          } catch (parseError) {
-            console.warn("Failed to parse SSE event:", jsonStr, parseError);
+        try {
+          const event: StreamEvent = JSON.parse(jsonStr);
+
+          if (event.type === "token") {
+            onToken(event.content);
+          } else if (event.type === "end") {
+            onComplete();
+            return;
           }
+        } catch (parseError) {
+          console.warn("Failed to parse SSE event:", jsonStr, parseError);
         }
       }
     }
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      // Stream was intentionally aborted
-      return;
+      return; // intentional cancellation
     }
     onError(error instanceof Error ? error : new Error("Stream failed"));
   }
 }
 
-/**
- * Create an abort controller for stream cancellation
- */
+/** Create an AbortController for stream cancellation */
 export function createStreamController(): AbortController {
   return new AbortController();
 }

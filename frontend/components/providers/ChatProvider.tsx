@@ -82,7 +82,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function loadThreads() {
       try {
-        const threads = await apiClient.chat.getThreads();
+        const threadList = await apiClient.threads.list();
+        // Map ThreadListItem to Thread (summary is not available in list)
+        const threads: Thread[] = threadList.map((t) => ({
+          ...t,
+          summary: null,
+        }));
         dispatch({ type: "SET_THREADS", threads });
       } catch (error) {
         console.error("Failed to load threads:", error);

@@ -1,81 +1,86 @@
-// Chat Thread
+// ─── Thread ──────────────────────────────────────────────────────────────────
+
+/** A chat thread as returned by GET /api/v1/threads */
+export interface ThreadListItem {
+  thread_id: string;
+  title: string | null;
+  video_id: string;
+  created_at: string; // ISO 8601
+}
+
+/** Full thread info (used in UI state after creation) */
 export interface Thread {
   thread_id: string;
   video_id: string;
-  title: string;
-  summary: string;
+  title: string | null;
+  summary: string | null;
   created_at: string;
 }
 
-// Chat Message
+// ─── Messages ─────────────────────────────────────────────────────────────────
+
+/** A single message as returned by GET /api/v1/threads/{id}/messages */
+export interface MessageResponse {
+  message_id: number;   // 0-based index in LangGraph state
+  role: "human" | "ai";
+  content: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;   // ISO 8601
+}
+
+/** Local UI message shape (maps role → sender for display) */
 export interface Message {
   message_id: number;
   sender: "user" | "ai";
   content: string;
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, unknown> | null;
   created_at: string;
 }
 
-// API Request/Response types
-export interface InitRequest {
-  youtube_url: string;
+// ─── API Request / Response ───────────────────────────────────────────────────
+
+/** POST /api/v1/threads request body */
+export interface CreateThreadRequest {
+  video_url: string;
 }
 
-export interface InitResponse {
+/** POST /api/v1/threads response */
+export interface CreateThreadResponse {
   thread_id: string;
   video_id: string;
-  title: string;
-  summary: string;
+  title: string | null;
+  summary: string | null;
 }
 
-export interface HistoryResponse {
+/** GET /api/v1/threads/{id}/messages response */
+export interface ThreadMessagesResponse {
   thread_id: string;
-  video_id: string;
-  messages: Message[];
+  messages: MessageResponse[];
 }
 
-// SSE Stream Events
+/** DELETE /api/v1/threads/{id} response */
+export interface DeleteThreadResponse {
+  success: boolean;
+  thread_id: string;
+}
+
+// ─── SSE Stream Events ────────────────────────────────────────────────────────
+
+/** Partial AI response chunk */
 export interface StreamTokenEvent {
   type: "token";
   content: string;
 }
 
-export interface StreamSourcesEvent {
-  type: "sources";
-  chunks: Array<{
-    text: string;
-    start_time?: number;
-    end_time?: number;
-  }>;
-}
-
+/** End of stream */
 export interface StreamEndEvent {
   type: "end";
-  message_id: number;
 }
 
-export interface StreamErrorEvent {
-  type: "error";
-  message: string;
-}
+export type StreamEvent = StreamTokenEvent | StreamEndEvent;
 
-export type StreamEvent =
-  | StreamTokenEvent
-  | StreamSourcesEvent
-  | StreamEndEvent
-  | StreamErrorEvent;
+// ─── UI State ─────────────────────────────────────────────────────────────────
 
-// Video metadata
-export interface VideoMetadata {
-  video_id: string;
-  title: string;
-  channel: string;
-  duration: string;
-  thumbnail_url: string;
-  published_at: string;
-}
-
-// UI State
 export interface ChatState {
   threads: Thread[];
   activeThreadId: string | null;
