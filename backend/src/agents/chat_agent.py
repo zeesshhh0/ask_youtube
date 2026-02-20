@@ -1,7 +1,7 @@
 from typing import Dict, List, TypedDict
 from langchain.tools import tool
 from langchain.agents import create_agent
-from api.deps import get_llm, get_vector_store
+from src.api.deps import get_llm, get_vector_store
 from langchain.tools import tool, ToolRuntime
 from langchain.agents.middleware import dynamic_prompt, ModelRequest, AgentState
 from langsmith import Client

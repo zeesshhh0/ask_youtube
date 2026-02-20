@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import asyncio
 from urllib.parse import urlparse, parse_qs, urlencode
 from urllib.request import urlopen
@@ -111,6 +112,38 @@ class YouTubeTools:
         except Exception as e:
             print(f"[{datetime.now()}] ERROR: Exception while getting video data: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error getting video data: {str(e)}")
+
+    @staticmethod
+    def get_video_duration(url: str) -> Optional[int]:
+        """Function to get the video duration in seconds from a YouTube URL."""
+        print(f"[{datetime.now()}] get_video_duration called with URL: {url}")
+        
+        try:
+            video_id = YouTubeTools.get_youtube_video_id(url)
+            if not video_id:
+                print(f"[{datetime.now()}] WARNING: Could not extract video ID for duration")
+                return None
+                
+            # Construct standard watch URL for reliable duration scraping
+            fetch_url = f"https://www.youtube.com/watch?v={video_id}"
+            print(f"[{datetime.now()}] Fetching duration from: {fetch_url}")
+
+            # Using urllib to fetch the page content
+            with urlopen(fetch_url) as response:
+                html = response.read().decode('utf-8')
+                
+                # Search for lengthSeconds in the HTML content
+                match = re.search(r'\"lengthSeconds\":\"(\d+)\"', html)
+                if match:
+                    duration = int(match.group(1))
+                    print(f"[{datetime.now()}] Video duration found: {duration} seconds")
+                    return duration
+            
+            print(f"[{datetime.now()}] WARNING: Could not find lengthSeconds in HTML")
+            return None
+        except Exception as e:
+            print(f"[{datetime.now()}] ERROR: Exception while getting video duration: {str(e)}")
+            return None
 
     @staticmethod
     def _create_youtube_api():

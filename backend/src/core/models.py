@@ -13,6 +13,7 @@ class YTVideo(SQLModel, table=True):
     author_name: Optional[str] = None
     thumbnail_url: Optional[str] = None
     transcript: str
+    duration: Optional[int] = Field(default=None)
     summary: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

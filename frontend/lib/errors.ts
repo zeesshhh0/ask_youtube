@@ -28,6 +28,8 @@ export const errorMessages = {
 
   threadNotFound: "This chat thread could not be found.",
 
+  videoTooLong: "Video is too long. Maximum allowed duration is 20 minutes.",
+
   rateLimited: "Too many requests. Please wait a moment and try again.",
 };
 
@@ -38,6 +40,8 @@ export function getErrorMessage(error: unknown): string {
         return errorMessages.invalidUrl;
       case 404:
         return errorMessages.threadNotFound;
+      case 413:
+        return errorMessages.videoTooLong;
       case 422:
         return errorMessages.noTranscript;
       case 429:

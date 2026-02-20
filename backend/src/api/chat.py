@@ -58,6 +58,7 @@ async def create_thread(
         return CreateThreadResponse(
             thread_id=thread.thread_id,
             video_id=video.video_id,
+            duration=video.duration,
             title=video.title,
             summary=video.summary,
         )

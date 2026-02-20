@@ -34,6 +34,7 @@ class CreateThreadResponse(BaseModel):
     thread_id: str
     video_id: str
     title: str | None = None
+    duration: int | None = None
     summary: str | None = None
 
 

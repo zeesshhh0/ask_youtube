@@ -31,10 +31,24 @@ async def ingest_youtube_video(
 
     if video:
         return video
+    
+    try:
+        duration = YouTubeTools.get_video_duration(video_url)
+        if duration and duration > 1200:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Video is too long ({duration}s). Maximum allowed duration is 1200 seconds (20 minutes)."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"Failed to fetch duration for {video_id}: {e}")
+        duration = None
 
     logger.info(f"Ingesting new video: {video_id}")
     video_info = YouTubeTools.get_video_data(video_url)
     transcript = await YouTubeTools.get_video_timestamps(video_url)
+    
 
     if not transcript or transcript.startswith("No captions"):
         raise HTTPException(
@@ -100,6 +114,7 @@ async def ingest_youtube_video(
         author_name=video_info.get("author_name"),
         thumbnail_url=video_info.get("thumbnail_url"),
         transcript=transcript,
+        duration=duration,
         summary=video_global_summary,  # type: ignore
     )
     session.add(video)
