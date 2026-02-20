@@ -7,7 +7,6 @@ from src.core.database import init_db
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from contextlib import asynccontextmanager
 import uvicorn
-import os
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

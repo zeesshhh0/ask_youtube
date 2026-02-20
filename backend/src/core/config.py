@@ -77,11 +77,6 @@ class Settings:
         self.API_V1_STR = os.getenv("API_V1_STR", "/api/v1")
         self.DEBUG = os.getenv("DEBUG", "false").lower() in ("true", "1", "t", "yes")
 
-        # Langfuse Configuration
-        self.LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY", "")
-        self.LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY", "")
-        self.LANGFUSE_HOST = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
-
         # RAG Configuration
         self.CHROMA_DB_PATH = os.getenv("CHROMA_DB_PATH", "./.chroma")
         self.RETRIVER_STORE_PATH = os.getenv("RETRIVER_STORE_PATH", "./.retriever_store")
@@ -115,10 +110,6 @@ class Settings:
             "health": ["20 per minute"],
         }
 
-        # Update rate limit endpoints from environment variables
-
-
-        # Evaluation Configuration
 
         # Apply environment-specific settings
         self.apply_environment_settings()

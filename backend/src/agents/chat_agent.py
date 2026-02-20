@@ -1,14 +1,13 @@
 from typing import Dict, List, TypedDict
 from langchain.tools import tool
 from langchain.agents import create_agent
-from src.common.services import vector_store, llm
+from api.deps import get_llm, get_vector_store
 from langchain.tools import tool, ToolRuntime
 from langchain.agents.middleware import dynamic_prompt, ModelRequest, AgentState
 from langsmith import Client
 from langgraph.checkpoint.memory import InMemorySaver
 from langchain_classic.prompts import BaseChatPromptTemplate
 from collections import defaultdict
-
 
 langsmith_client = Client()
 ask_youtube_agent_system_prompt : BaseChatPromptTemplate = langsmith_client.pull_prompt(
@@ -53,9 +52,9 @@ def retrieve_context(query: str, runtime: ToolRuntime[YTAgentState]):
 
     video_ids = [vid['video_id'] for vid in videos]
 
-    retrieved_docs = vector_store.similarity_search(
+    retrieved_docs = get_vector_store().similarity_search(
         query,
-        k=5,
+        k=3,
         filter={
             "video_id": {"$in": video_ids}
         } # type: ignore
@@ -84,7 +83,7 @@ def retrieve_context(query: str, runtime: ToolRuntime[YTAgentState]):
 
 
 agent = create_agent(
-    model=llm,
+    model=get_llm(),
     tools=[retrieve_context],
     middleware=[inject_video_summaries],
     state_schema=YTAgentState,
