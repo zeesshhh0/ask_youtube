@@ -2,7 +2,9 @@ from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage
 from sqlmodel import select
+from langchain_core.messages.ai import AIMessageChunk
 from sqlmodel.ext.asyncio.session import AsyncSession
+from src.agents.chat_agent import YTAgentState, YoutubeVideo
 from src.core.database import get_db
 from src.core.models import YTVideo, Thread, Message
 from src.common.youtube_tools import YouTubeTools
@@ -19,6 +21,7 @@ from src.api.schemas import (
 )
 from langchain_classic.text_splitter import RecursiveCharacterTextSplitter
 from uuid import uuid4
+from datetime import datetime
 import json
 import logging
 
@@ -210,35 +213,51 @@ async def send_message(
     session: AsyncSession = Depends(get_db),
 ):
     """Send a user message and stream the AI response via SSE."""
-    # Validate thread exists and get the associated video_id
+
     result = await session.exec(select(Thread).where(Thread.thread_id == thread_id))
     thread = result.first()
+    print(thread)
+    
     if not thread:
         raise HTTPException(status_code=404, detail="Thread not found")
+    
+    ytvideo_result = await session.exec(select(YTVideo).where(YTVideo.video_id == thread.video_id)) 
+    ytvideo = ytvideo_result.first()
 
+    if not ytvideo:
+        raise HTTPException(status_code=404, detail="video not found")
+    
+    
     async def event_generator():
-        graph = request.app.state.graph
+        agent = request.app.state.agent
         config = {
             "configurable": {
                 "thread_id": thread_id,
-                "video_id": thread.video_id,
             }
         }
+        
+        video = YoutubeVideo(
+        video_id= thread.video_id,
+        title= ytvideo.title,
+        summary= ytvideo.summary
+        )
 
-        async for event in graph.astream_events(
-            {"messages": [HumanMessage(content=message.content)]},
+        input: YTAgentState = YTAgentState(
+            messages=[HumanMessage(content= message.content)],
+            videos=[video]
+            )
+
+        async for event in agent.astream(
+            input = input,
             config=config,
-            version="v2",
+            stream_mode="messages"
         ):
-            kind = event["event"]
-
-            if kind == "on_chat_model_stream":
-                content = event["data"]["chunk"].content
+            msg = event[0]
+            
+            if isinstance(msg, AIMessageChunk):
+                content = msg.content
                 if content:
                     yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
-
-            elif kind == "on_chain_end" and event["name"] == "retrieve_context":
-                pass
 
         yield f"data: {json.dumps({'type': 'end'})}\n\n"
 
@@ -256,10 +275,10 @@ async def send_message(
 )
 async def get_messages(thread_id: str, request: Request):
     """Retrieve the message history for a thread."""
-    graph = request.app.state.graph
+    agent = request.app.state.agent
     config = {"configurable": {"thread_id": thread_id}}
 
-    state = await graph.aget_state(config)
+    state = await agent.aget_state(config)
     raw_messages = state.values.get("messages", [])
 
     messages = [
@@ -268,7 +287,7 @@ async def get_messages(thread_id: str, request: Request):
             role="human" if msg.type == "human" else "ai",
             content=msg.content if isinstance(msg.content, str) else str(msg.content),
             metadata=getattr(msg, "response_metadata", None),
-            created_at=getattr(msg, "created_at", None) or "1970-01-01T00:00:00",
+            created_at=getattr(msg, "created_at", None) or datetime.fromisoformat("1970-01-01T00:00:00"),
         )
         for i, msg in enumerate(raw_messages)
         if msg.type in ("human", "ai")

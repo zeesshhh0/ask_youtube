@@ -11,7 +11,7 @@ export async function DELETE(
   const { threadId } = await params;
 
   try {
-    const response = await fetch(`${config.apiUrl}/chat/${threadId}`, {
+    const response = await fetch(`${config.apiUrl}/api/v1/threads/${threadId}`, {
       method: "DELETE",
     });
 

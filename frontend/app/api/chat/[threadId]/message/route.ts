@@ -10,7 +10,7 @@ export async function POST(
   const body = await request.json();
 
   try {
-    const response = await fetch(`${config.apiUrl}/chat/${threadId}/message`, {
+    const response = await fetch(`${config.apiUrl}/api/v1/threads/${threadId}/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -36,7 +36,8 @@ export async function POST(
     return new Response(stream, {
       headers: {
         "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
+        "Cache-Control": "no-cache, no-transform",
+        "X-Accel-Buffering": "no",
         Connection: "keep-alive",
       },
     });

@@ -54,15 +54,18 @@ export default function ThreadPage() {
 
     async function loadThreadData() {
       try {
-        // GET /api/v1/threads/{threadId}/messages — history also gives us thread context
+        // 1. Fetch thread list to find our thread details (video_id, title)
+        const threadsList = await apiClient.threads.list();
+        const existingThreadInList = threadsList.find((t) => t.thread_id === threadId);
+
+        // 2. Fetch history
         const response = await apiClient.threads.getMessages(threadId);
 
-        // Build a minimal Thread from the messages response
         const threadData: Thread = {
-          thread_id: response.thread_id,
-          video_id: "", // not returned by messages endpoint; sidebar will have full data
-          title: null,
-          summary: null,
+          thread_id: threadId,
+          video_id: existingThreadInList?.video_id || "",
+          title: existingThreadInList?.title || null,
+          summary: null, // summary is only available from POST /threads response (or first AI message)
           created_at: response.messages[0]?.created_at || new Date().toISOString(),
         };
 
@@ -93,7 +96,7 @@ export default function ThreadPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="flex-1 flex flex-col min-h-0">
         <div className="border-b p-4">
           <Skeleton className="h-6 w-48" />
         </div>
@@ -114,11 +117,19 @@ export default function ThreadPage() {
 
   if (!thread) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex-1 flex flex-col min-h-0 items-center justify-center">
         <p className="text-muted-foreground">Thread not found</p>
       </div>
     );
   }
 
-  return <ChatContainer thread={thread} initialMessages={messages} />;
+  return (
+    <div className="flex-1 flex flex-col min-h-0">
+      <ChatContainer 
+        key={thread.thread_id} 
+        thread={thread} 
+        initialMessages={messages} 
+      />
+    </div>
+  );
 }

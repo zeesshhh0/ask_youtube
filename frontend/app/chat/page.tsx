@@ -54,7 +54,7 @@ export default function NewChatPage() {
   );
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <ChatHeader />
       <VideoUrlPrompt
         onSubmit={handleSubmit}

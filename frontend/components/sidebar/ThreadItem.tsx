@@ -1,11 +1,10 @@
 "use client";
 
 import { memo } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Thread } from "@/lib/types";
-import { MessageSquare, Youtube } from "lucide-react";
+import { Youtube } from "lucide-react";
 
 interface ThreadItemProps {
   thread: Thread;

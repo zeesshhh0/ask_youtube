@@ -9,11 +9,11 @@ class YTVideo(SQLModel, table=True):
     
     video_id: str = Field(primary_key=True)
     url: str
-    title: Optional[str] = None
+    title: str
     author_name: Optional[str] = None
     thumbnail_url: Optional[str] = None
     transcript: str
-    summary: Optional[str] = None
+    summary: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     

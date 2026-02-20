@@ -36,7 +36,8 @@ export async function handleSSEStream(
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`);
     }
 
     const reader = response.body?.getReader();
@@ -46,40 +47,68 @@ export async function handleSSEStream(
 
     const decoder = new TextDecoder();
     let buffer = "";
+    let isCompleted = false;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    const processLine = (line: string) => {
+      const trimmedLine = line.trim();
+      if (!trimmedLine || !trimmedLine.startsWith("data:")) return;
 
-      buffer += decoder.decode(value, { stream: true });
+      const data = trimmedLine.substring(5).trim();
+      if (!data || data === "[DONE]") return;
 
-      // Split on newlines; keep the last (potentially incomplete) line in buffer
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
+      try {
+        const event: StreamEvent = JSON.parse(data);
 
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-
-        const jsonStr = line.slice(6).trim();
-        if (!jsonStr || jsonStr === "[DONE]") continue;
-
-        try {
-          const event: StreamEvent = JSON.parse(jsonStr);
-
-          if (event.type === "token") {
-            onToken(event.content);
-          } else if (event.type === "end") {
-            onComplete();
-            return;
-          }
-        } catch (parseError) {
-          console.warn("Failed to parse SSE event:", jsonStr, parseError);
+        if (event.type === "token" && typeof event.content === "string") {
+          onToken(event.content);
+        } else if (event.type === "end") {
+          isCompleted = true;
+          onComplete();
         }
+      } catch (parseError) {
+        // Only log if it's not a common non-JSON SSE message
+        if (!data.startsWith("{")) {
+          return; 
+        }
+        console.warn("Failed to parse SSE JSON:", data, parseError);
       }
+    };
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split(/\r?\n/);
+        // Keep the last partial line in the buffer
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          processLine(line);
+          if (isCompleted) break;
+        }
+
+        if (isCompleted) break;
+      }
+
+      // Process any remaining data in the buffer
+      if (!isCompleted && buffer) {
+        processLine(buffer);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    // Always ensure onComplete is called if we haven't already
+    if (!isCompleted) {
+      onComplete();
     }
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      return; // intentional cancellation
+      return;
     }
     onError(error instanceof Error ? error : new Error("Stream failed"));
   }

@@ -3,6 +3,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Youtube, ExternalLink } from "lucide-react";
+import Image from "next/image";
 
 interface VideoCardProps {
   videoId: string;
@@ -17,11 +18,13 @@ export function VideoCard({ videoId, title, channel, duration }: VideoCardProps)
 
   return (
     <Card className="overflow-hidden">
-      <div className="relative">
-        <img
+      <div className="relative aspect-video">
+        <Image
           src={thumbnailUrl}
           alt={title}
-          className="w-full aspect-video object-cover"
+          fill
+          className="object-cover"
+          unoptimized // YouTube thumbnail URLs don't work well with Next.js image optimization without configuration
         />
         {duration && (
           <Badge

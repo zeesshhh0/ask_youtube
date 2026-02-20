@@ -7,13 +7,13 @@ import type {
   DeleteThreadResponse,
 } from "@/lib/types";
 
-const BASE = `${config.apiUrl}/api/v1`;
+const BASE = "/api/chat";
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     throw new ApiError(
-      errorData.detail || errorData.message || "Request failed",
+      errorData.detail || errorData.message || errorData.error || "Request failed",
       response.status,
       errorData
     );
@@ -24,10 +24,10 @@ async function handleResponse<T>(response: Response): Promise<T> {
 export const apiClient = {
   threads: {
     /**
-     * POST /api/v1/threads — ingest a YouTube video and create a new thread.
+     * POST /api/chat — ingest a YouTube video and create a new thread.
      */
     create: async (videoUrl: string): Promise<CreateThreadResponse> => {
-      const res = await fetch(`${BASE}/threads`, {
+      const res = await fetch(`${BASE}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ video_url: videoUrl }),
@@ -36,11 +36,11 @@ export const apiClient = {
     },
 
     /**
-     * GET /api/v1/threads — list all threads.
+     * GET /api/chat — list all threads.
      */
     list: async (): Promise<ThreadListItem[]> => {
       try {
-        const res = await fetch(`${BASE}/threads`);
+        const res = await fetch(`${BASE}`);
         return handleResponse<ThreadListItem[]>(res);
       } catch {
         return [];
@@ -48,28 +48,28 @@ export const apiClient = {
     },
 
     /**
-     * DELETE /api/v1/threads/{thread_id} — delete a thread and its messages.
+     * DELETE /api/chat/{thread_id} — delete a thread and its messages.
      */
     delete: async (threadId: string): Promise<DeleteThreadResponse> => {
-      const res = await fetch(`${BASE}/threads/${threadId}`, {
+      const res = await fetch(`${BASE}/${threadId}`, {
         method: "DELETE",
       });
       return handleResponse<DeleteThreadResponse>(res);
     },
 
     /**
-     * GET /api/v1/threads/{thread_id}/messages — get full message history.
+     * GET /api/chat/{thread_id}/history — get full message history.
      */
     getMessages: async (threadId: string): Promise<ThreadMessagesResponse> => {
-      const res = await fetch(`${BASE}/threads/${threadId}/messages`);
+      const res = await fetch(`${BASE}/${threadId}/history`);
       return handleResponse<ThreadMessagesResponse>(res);
     },
 
     /**
      * Returns the URL for the SSE message stream endpoint.
-     * POST /api/v1/threads/{thread_id}/messages — streams AI response via SSE.
+     * POST /api/chat/{thread_id}/message — streams AI response via SSE.
      */
     getMessageStreamUrl: (threadId: string): string =>
-      `${BASE}/threads/${threadId}/messages`,
+      `${BASE}/${threadId}/message`,
   },
 };

@@ -26,6 +26,7 @@ export function ChatContainer({
   const [isLoading, setIsLoading] = useState(!initialMessages.length);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const messageIdRef = useRef(
     Math.max(...initialMessages.map((m) => m.message_id), 0)
@@ -67,12 +68,12 @@ export function ChatContainer({
       const welcomeMessage: Message = {
         message_id: 0,
         sender: "ai",
-        content: `👋 Hi! I've processed the video "${thread.title}".\n\nHere's a quick summary:\n${thread.summary}\n\nFeel free to ask me anything about the content, concepts explained, or specific details from the video!`,
+        content: `👋 Hi! I've processed the video "${thread.title}". Feel free to ask me anything about the content, concepts explained, or specific details from the video!`,
         created_at: new Date().toISOString(),
       };
       setMessages([welcomeMessage]);
     }
-  }, [isLoading, messages?.length, thread.title, thread.summary]);
+  }, [isLoading, messages.length, thread.title, thread.summary]);
 
   const handleSendMessage = useCallback(
     async (content: string) => {
@@ -88,6 +89,7 @@ export function ChatContainer({
       setMessages((prev) => [...prev, userMessage]);
       setIsStreaming(true);
       setStreamingContent("");
+      setError(null);
 
       // Create abort controller for this request
       abortControllerRef.current = createStreamController();
@@ -105,35 +107,51 @@ export function ChatContainer({
               setStreamingContent(aiContent);
             },
             onComplete: () => {
-              const aiMessage: Message = {
-                message_id: aiMessageId,
-                sender: "ai",
-                content: aiContent,
-                created_at: new Date().toISOString(),
-              };
-              setMessages((prev) => [...prev, aiMessage]);
               setIsStreaming(false);
               setStreamingContent("");
+              
+              if (aiContent.trim()) {
+                const aiMessage: Message = {
+                  message_id: aiMessageId,
+                  sender: "ai",
+                  content: aiContent,
+                  created_at: new Date().toISOString(),
+                };
+                setMessages((prev) => [...prev, aiMessage]);
+              }
             },
-            onError: (error) => {
-              toast.error(getErrorMessage(error));
+            onError: (err) => {
+              const errorMessage = getErrorMessage(err);
+              toast.error(errorMessage);
+              setError(errorMessage);
               setIsStreaming(false);
-              setStreamingContent("");
             },
           },
           abortControllerRef.current.signal
         );
-      } catch (error) {
-        toast.error(getErrorMessage(error));
+      } catch (err) {
+        const errorMessage = getErrorMessage(err);
+        toast.error(errorMessage);
+        setError(errorMessage);
         setIsStreaming(false);
-        setStreamingContent("");
       }
     },
     [thread.thread_id]
   );
 
+  const handleRetry = useCallback(() => {
+    // Find last user message
+    const lastUserMessage = [...messages].reverse().find((m) => m.sender === "user");
+    if (lastUserMessage) {
+      // Remove messages after that user message
+      const index = messages.lastIndexOf(lastUserMessage);
+      setMessages(messages.slice(0, index + 1));
+      handleSendMessage(lastUserMessage.content);
+    }
+  }, [messages, handleSendMessage]);
+
   // Show streaming message in the list
-  const displayMessages = isStreaming && streamingContent
+  const displayMessages = (isStreaming || error) && streamingContent
     ? [
       ...messages,
       {
@@ -141,19 +159,28 @@ export function ChatContainer({
         sender: "ai" as const,
         content: streamingContent,
         created_at: new Date().toISOString(),
+        metadata: error ? { error: true } : undefined,
       },
     ]
     : messages;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <ChatHeader title={thread.title ?? undefined} videoId={thread.video_id} />
 
       <ChatMessages
         messages={displayMessages}
         isLoading={isLoading}
         isStreaming={isStreaming}
-        streamingMessageId={isStreaming ? -1 : undefined}
+        streamingMessageId={isStreaming && streamingContent ? -1 : undefined}
+        videoInfo={
+          thread.title
+            ? { videoId: thread.video_id, title: thread.title }
+            : undefined
+        }
+        summary={thread.summary}
+        error={error}
+        onRetry={handleRetry}
       />
 
       <ChatInput

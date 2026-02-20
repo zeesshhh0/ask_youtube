@@ -88,6 +88,5 @@ agent = create_agent(
     tools=[retrieve_context],
     middleware=[inject_video_summaries],
     state_schema=YTAgentState,
-    checkpointer=InMemorySaver(),
-    debug=True
+    # debug=True
 )

@@ -1,8 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-# from services.youtube_tools import YouTubeTools
 from src.api import chat
-from src.agents.chat.graph import workflow
+from src.agents.chat_agent import agent
 from src.core.config import settings
 from src.core.database import init_db
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
@@ -14,7 +13,8 @@ import os
 async def lifespan(app: FastAPI):
     await init_db()
     async with AsyncSqliteSaver.from_conn_string(settings.CHECKPOINT_DB_PATH) as checkpointer:
-        app.state.graph = workflow.compile(checkpointer=checkpointer)
+        agent.checkpointer = checkpointer
+        app.state.agent = agent
         yield
 
 app = FastAPI(debug=True, lifespan=lifespan)

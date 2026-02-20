@@ -9,7 +9,7 @@ export async function GET(
   const { threadId } = await params;
 
   try {
-    const response = await fetch(`${config.apiUrl}/chat/${threadId}/history`);
+    const response = await fetch(`${config.apiUrl}/api/v1/threads/${threadId}/messages`);
     const data = await response.json();
 
     if (!response.ok) {
