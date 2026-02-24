@@ -56,8 +56,8 @@ async def ingest_youtube_video(
             detail="No transcript available for this video",
         )
 
-    parent_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200)
-    child_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    parent_splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=300)
+    child_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
 
     parent_docs = parent_splitter.create_documents([transcript])
 
@@ -67,10 +67,26 @@ async def ingest_youtube_video(
     chapter_summaries_list = []
 
     for p_index, parent_doc in enumerate(parent_docs):
-        chapter_prompt = (
-            f"Summarize this specific video section in 2 sentences:\n\n"
-            f"{parent_doc.page_content}"
-        )
+        chapter_prompt = f"""You are summarizing a section of a YouTube video transcript for use in a retrieval-augmented search system.
+
+        Your goal is to write a dense, information-rich summary that preserves:
+        - The core topic or argument of this section
+        - Any specific facts, names, tools, or steps mentioned
+        - The "so what" — why this section matters in the broader video
+
+        Rules:
+        - Write exactly 2-3 sentences
+        - Use plain, direct language (no filler like "In this section...")
+        - Preserve technical terms exactly as spoken
+        - Do NOT add information not present in the transcript
+
+        Transcript section:
+        \"\"\"
+        {parent_doc.page_content}
+        \"\"\"
+
+        Summary:"""
+        
         chapter_summary_res = await llm.ainvoke(chapter_prompt)
         chapter_context = chapter_summary_res.content
 
@@ -90,11 +106,23 @@ async def ingest_youtube_video(
             })
 
     combined_summaries = "\n- ".join(chapter_summaries_list)
-    global_summary_prompt = (
-        f"Here is an outline of a video based on its chapter summaries:\n\n"
-        f"- {combined_summaries}\n\n"
-        f"Task: Write a concise 5 Sentence Global Summary of the entire video based on this outline."
-    )
+    global_summary_prompt = f"""You are creating a global summary of a YouTube video based on its section summaries.
+
+    This summary will be shown to users who want to quickly understand what the entire video covers before asking questions about it.
+
+    Chapter summaries:
+    {combined_summaries}
+
+    Task: Write a 4-6 sentence global summary that:
+    1. Opens with the video's central topic and purpose
+    2. Covers the main themes/phases in logical order
+    3. Highlights the most important takeaways or conclusions
+    4. Uses language a reader unfamiliar with the topic can understand
+
+    Do not use bullet points. Write in flowing prose. Do not reference "chapters" or "sections" explicitly.
+
+    Global Summary:"""
+    
     global_summary_res = await llm.ainvoke(global_summary_prompt)
     video_global_summary = global_summary_res.content
 

@@ -256,7 +256,7 @@ class YouTubeTools:
             for i, snippet in enumerate(fetched_transcript):
                 start = int(snippet.start)
                 minutes, seconds = divmod(start, 60)
-                timestamp = f"{minutes}:{seconds:02d} - {snippet.text}"
+                timestamp = f"[{minutes}:{seconds:02d}] - {snippet.text}"
                 timestamps.append(timestamp)
 
                 if i < 5:  
