@@ -1,7 +1,7 @@
 from typing import List, Optional
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
-from src.core.models import Thread, Message, YTVideo
+from src.core.models import Thread, Message
 
 async def get_thread_by_id(session: AsyncSession, thread_id: str) -> Optional[Thread]:
     """Retrieve a single thread by its ID."""

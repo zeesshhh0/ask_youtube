@@ -2,8 +2,6 @@ from typing import AsyncGenerator
 from fastapi import Request
 from langchain_pinecone import PineconeVectorStore
 from sqlmodel.ext.asyncio.session import AsyncSession
-import chromadb
-from langchain_chroma import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from src.core.config import settings
 from src.core.database import engine

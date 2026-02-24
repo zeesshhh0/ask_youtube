@@ -1,15 +1,12 @@
 import json
-import os
 import re
 import asyncio
 from urllib.parse import urlparse, parse_qs, urlencode
 from urllib.request import urlopen
 from typing import Optional, List
 from datetime import datetime
-from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import HTTPException
 from dotenv import load_dotenv
 
 

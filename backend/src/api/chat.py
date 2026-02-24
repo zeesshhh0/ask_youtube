@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage
-from sqlmodel import select
 from langchain_core.messages.ai import AIMessageChunk
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.agents.chat_agent import YTAgentState, YoutubeVideo
@@ -19,7 +18,6 @@ from src.api.schemas import (
     ErrorResponse,
 )
 from src.services.youtube_service import ingest_youtube_video
-from uuid import uuid4
 from datetime import datetime
 import json
 import logging
