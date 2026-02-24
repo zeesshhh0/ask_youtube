@@ -48,7 +48,7 @@ class ThreadListItem(BaseModel):
 
 class MessageResponse(BaseModel):
     """Single message in a thread's history."""
-    message_id: int
+    message_id: str
     role: str  # "human" or "ai"
     content: str
     metadata: dict | None = None

@@ -29,3 +29,4 @@ evals/reports/
 *.db
 .chroma
 .DS_Store
+checkpoints*

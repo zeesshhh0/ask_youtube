@@ -82,7 +82,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function loadThreads() {
       try {
-        const threadList = await apiClient.threads.list();
+        const threadList = (await apiClient.threads.list()).reverse();
         // Map ThreadListItem to Thread (summary is not available in list)
         const threads: Thread[] = threadList.map((t) => ({
           ...t,

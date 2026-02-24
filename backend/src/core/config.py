@@ -72,12 +72,11 @@ class Settings:
         # RAG Configuration
         self.CHROMA_DB_PATH = os.getenv("CHROMA_DB_PATH", "./.chroma")
         self.PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "ask-youtube")
-        self.RETRIVER_STORE_PATH = os.getenv("RETRIVER_STORE_PATH", "./.retriever_store")
-        self.CHROMA_COLLECTION_NAME = os.getenv("CHROMA_COLLECTION_NAME", "youtube_videos")
         self.FAST_LLM_MODEL = os.getenv("FAST_LLM_MODEL", "gemini-2.5-flash")
         self.FASTEST_LLM_MODEL = os.getenv("FASTEST_LLM_MODEL", "gemini-2.5-flash-lite")
         self.SMART_LLM_MODEL = os.getenv("SMART_LLM_MODEL", "gemini-2.5-pro")
         self.EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
+        self.OUTPUT_DIMENSIONALITY = os.getenv("OUTPUT_DIMENSIONALITY", 768)
         self.CHECKPOINT_DB_PATH = os.getenv("CHECKPOINT_DB_PATH", "checkpoints.db")
         self.APP_DB_PATH = os.getenv("APP_DB_PATH", "app.db")
 

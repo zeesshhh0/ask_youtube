@@ -33,14 +33,21 @@ export function ChatInput({
   const isOverLimit = charCount > config.maxMessageLength;
   const canSubmit = input.trim().length > 0 && !isOverLimit && !disabled;
 
-  // Auto-resize textarea
+  // Auto-resize textarea and focus management
   useEffect(() => {
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = "auto";
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 400)}px`;
     }
   }, [input]);
+
+  // Auto-focus on mount
+  useEffect(() => {
+    if (!disabled && !isSubmitting) {
+      textareaRef.current?.focus();
+    }
+  }, [disabled, isSubmitting]);
 
   const handleSubmit = useCallback(
     async (e?: FormEvent) => {
@@ -55,9 +62,13 @@ export function ChatInput({
         await onSubmit(message);
       } finally {
         setIsSubmitting(false);
-        // Reset textarea height
+        // Reset textarea height and refocus
         if (textareaRef.current) {
           textareaRef.current.style.height = "auto";
+          // Small delay to ensure it focuses after React state updates enable the input
+          setTimeout(() => {
+            textareaRef.current?.focus();
+          }, 0);
         }
       }
     },
@@ -86,9 +97,9 @@ export function ChatInput({
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={disabled || isSubmitting}
-            rows={1}
+            rows={2}
             className={cn(
-              "min-h-[44px] max-h-[200px] resize-none pr-12",
+              "min-h-[64px] max-h-[400px] resize-none pr-12 py-3 text-base md:text-sm rounded-xl shadow-sm",
               isOverLimit && "border-destructive focus-visible:ring-destructive"
             )}
             aria-label="Message input"
@@ -97,7 +108,7 @@ export function ChatInput({
             type="submit"
             size="icon"
             disabled={!canSubmit || isSubmitting}
-            className="absolute right-2 bottom-2 h-8 w-8"
+            className="absolute right-3 bottom-3 h-8 w-8"
             aria-label="Send message"
           >
             {isSubmitting ? (

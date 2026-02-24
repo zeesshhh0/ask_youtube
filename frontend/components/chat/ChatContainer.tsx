@@ -28,9 +28,6 @@ export function ChatContainer({
   const [streamingContent, setStreamingContent] = useState("");
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const messageIdRef = useRef(
-    Math.max(...initialMessages.map((m) => m.message_id), 0)
-  );
 
   // Load chat history on mount
   useEffect(() => {
@@ -48,10 +45,6 @@ export function ChatContainer({
           created_at: m.created_at,
         }));
         setMessages(historyMessages);
-        messageIdRef.current = Math.max(
-          ...historyMessages.map((m) => m.message_id),
-          0
-        );
       } catch (error) {
         toast.error(getErrorMessage(error));
       } finally {
@@ -66,7 +59,7 @@ export function ChatContainer({
   useEffect(() => {
     if (!isLoading && messages.length === 0 && thread.summary) {
       const welcomeMessage: Message = {
-        message_id: 0,
+        message_id: "welcome-message",
         sender: "ai",
         content: `👋 Hi! I've processed the video "${thread.title}". Feel free to ask me anything about the content, concepts explained, or specific details from the video!`,
         created_at: new Date().toISOString(),
@@ -78,7 +71,7 @@ export function ChatContainer({
   const handleSendMessage = useCallback(
     async (content: string) => {
       // Optimistic update - add user message immediately
-      const userMessageId = ++messageIdRef.current;
+      const userMessageId = crypto.randomUUID();
       const userMessage: Message = {
         message_id: userMessageId,
         sender: "user",
@@ -95,7 +88,7 @@ export function ChatContainer({
       abortControllerRef.current = createStreamController();
 
       let aiContent = "";
-      const aiMessageId = ++messageIdRef.current;
+      const aiMessageId = crypto.randomUUID();
 
       try {
         await handleSSEStream(
@@ -109,7 +102,7 @@ export function ChatContainer({
             onComplete: () => {
               setIsStreaming(false);
               setStreamingContent("");
-              
+
               if (aiContent.trim()) {
                 const aiMessage: Message = {
                   message_id: aiMessageId,
@@ -155,7 +148,7 @@ export function ChatContainer({
     ? [
       ...messages,
       {
-        message_id: -1,
+        message_id: "streaming-message",
         sender: "ai" as const,
         content: streamingContent,
         created_at: new Date().toISOString(),
@@ -172,7 +165,7 @@ export function ChatContainer({
         messages={displayMessages}
         isLoading={isLoading}
         isStreaming={isStreaming}
-        streamingMessageId={isStreaming && streamingContent ? -1 : undefined}
+        streamingMessageId={isStreaming && streamingContent ? "streaming-message" : undefined}
         videoInfo={
           thread.title
             ? { videoId: thread.video_id, title: thread.title }

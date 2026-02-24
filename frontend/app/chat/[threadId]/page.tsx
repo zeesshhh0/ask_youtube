@@ -55,7 +55,7 @@ export default function ThreadPage() {
     async function loadThreadData() {
       try {
         // 1. Fetch thread list to find our thread details (video_id, title)
-        const threadsList = await apiClient.threads.list();
+        const threadsList = (await apiClient.threads.list());
         const existingThreadInList = threadsList.find((t) => t.thread_id === threadId);
 
         // 2. Fetch history
@@ -125,10 +125,10 @@ export default function ThreadPage() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <ChatContainer 
-        key={thread.thread_id} 
-        thread={thread} 
-        initialMessages={messages} 
+      <ChatContainer
+        key={thread.thread_id}
+        thread={thread}
+        initialMessages={messages}
       />
     </div>
   );

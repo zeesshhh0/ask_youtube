@@ -23,6 +23,7 @@ def get_embeddings():
     """Dependency for getting the Embeddings Model."""
     return GoogleGenerativeAIEmbeddings(
       model=settings.EMBEDDING_MODEL,
+      output_dimensionality=settings.OUTPUT_DIMENSIONALITY # type: ignore
     )
 
 def get_vector_store():

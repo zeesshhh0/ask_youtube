@@ -15,7 +15,7 @@ interface ChatMessagesProps {
   messages: Message[];
   isLoading?: boolean;
   isStreaming?: boolean;
-  streamingMessageId?: number;
+  streamingMessageId?: string;
   videoInfo?: {
     videoId: string;
     title: string;

@@ -5,8 +5,12 @@ from langchain_core.messages.ai import AIMessageChunk
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.agents.chat_agent import YTAgentState, YoutubeVideo
 from src.api.deps import get_db, get_llm, get_embeddings, get_vector_store, get_agent
+from src.core.models import Message
+from src.core.database import engine
+from starlette.background import BackgroundTask
 from src.crud import thread as crud_thread
 from src.crud import video as crud_video
+from src.crud import message as crud_message
 from src.api.schemas import (
     CreateThreadRequest,
     CreateThreadResponse,
@@ -17,6 +21,7 @@ from src.api.schemas import (
     DeleteThreadResponse,
     ErrorResponse,
 )
+import json
 from src.services.youtube_service import ingest_youtube_video
 from datetime import datetime
 import json
@@ -25,7 +30,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/threads", tags=["Threads"])
-
 
 # ──────────────────────────────────────────────
 # POST /threads — Create a new thread (ingest video)
@@ -122,6 +126,8 @@ async def send_message(
 ):
     """Send a user message and stream the AI response via SSE."""
 
+    response_context = {'content': "" }
+
     thread = await crud_thread.get_thread_by_id(session, thread_id)
     if not thread:
         raise HTTPException(status_code=404, detail="Thread not found")
@@ -130,6 +136,14 @@ async def send_message(
     if not ytvideo:
         raise HTTPException(status_code=404, detail="video not found")
     
+    
+    user_message = Message(
+        thread_id=thread_id,
+        content=message.content,
+        sender="human",
+        )
+    
+    await crud_message.create_message(session, user_message)
     
     async def event_generator():
         config = {
@@ -158,12 +172,24 @@ async def send_message(
             
             if isinstance(msg, AIMessageChunk):
                 content = msg.content
+                response_context['content'] += content # type: ignore
                 if content:
                     yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
 
         yield f"data: {json.dumps({'type': 'end'})}\n\n"
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+    async def save_streamed_message():
+        if response_context['content']:
+            async with AsyncSession(engine, expire_on_commit=False) as bg_session:
+                ai_message = Message(
+                    thread_id=thread_id,
+                    content=response_context['content'],
+                    sender="ai",
+                )
+                await crud_message.create_message(session=bg_session, message=ai_message)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream", background=BackgroundTask(save_streamed_message))
 
 
 # ──────────────────────────────────────────────
@@ -178,24 +204,25 @@ async def send_message(
 async def get_messages(
     thread_id: str, 
     request: Request,
-    agent = Depends(get_agent),
+    session: AsyncSession = Depends(get_db)
 ):
     """Retrieve the message history for a thread."""
-    config = {"configurable": {"thread_id": thread_id}}
+    thread = await crud_thread.get_thread_by_id(session, thread_id)
+    if not thread:
+        raise HTTPException(status_code=404, detail="Thread not found")
 
-    state = await agent.aget_state(config)
-    raw_messages = state.values.get("messages", [])
+    messages_from_db = await crud_message.get_all_message_by_thread(session, thread_id)
 
     messages = [
         MessageResponse(
-            message_id=i,
-            role="human" if msg.type == "human" else "ai",
+            message_id=msg.message_id,
+            role="human" if msg.sender == "human" else "ai",
             content=msg.content if isinstance(msg.content, str) else str(msg.content),
-            metadata=getattr(msg, "response_metadata", None),
-            created_at=getattr(msg, "created_at", None) or datetime.fromisoformat("1970-01-01T00:00:00"),
+            metadata=json.loads(msg.metadata_json) if msg.metadata_json else None,
+            created_at=msg.created_at,
         )
-        for i, msg in enumerate(raw_messages)
-        if msg.type in ("human", "ai")
+        for msg in messages_from_db
+        if msg.sender in ("human", "ai")
     ]
 
     return ThreadMessagesResponse(thread_id=thread_id, messages=messages)

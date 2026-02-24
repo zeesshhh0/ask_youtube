@@ -3,6 +3,7 @@
 import { memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Tooltip,
@@ -71,8 +72,15 @@ function MessageBubbleComponent({
               {isUser ? (
                 <p className="whitespace-pre-wrap">{message.content}</p>
               ) : (
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkBreaks]}
+                    components={{
+                      p({ children }) {
+                        return <p className="mb-2 last:mb-0 whitespace-pre-wrap">{children}</p>;
+                      }
+                    }}
+                  >
                     {message.content}
                   </ReactMarkdown>
                   {isStreaming && (
@@ -89,7 +97,7 @@ function MessageBubbleComponent({
                         {(message.metadata.citations as any[]).map((citation, i) => (
                           <li key={i} className="text-xs text-muted-foreground flex gap-2">
                             <span className="font-medium">[{i + 1}]</span>
-                            <span>{citation.text || citation}</span>
+                            <span>{String(citation.text || citation)}</span>
                           </li>
                         ))}
                       </ul>

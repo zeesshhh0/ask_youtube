@@ -21,7 +21,7 @@ export interface Thread {
 
 /** A single message as returned by GET /api/v1/threads/{id}/messages */
 export interface MessageResponse {
-  message_id: number;   // 0-based index in LangGraph state
+  message_id: string;   // UUID from backend
   role: "human" | "ai";
   content: string;
   metadata: Record<string, unknown> | null;
@@ -30,7 +30,7 @@ export interface MessageResponse {
 
 /** Local UI message shape (maps role → sender for display) */
 export interface Message {
-  message_id: number;
+  message_id: string;
   sender: "user" | "ai";
   content: string;
   metadata?: Record<string, unknown> | null;
