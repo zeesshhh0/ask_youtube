@@ -1,13 +1,13 @@
-from sqlmodel import SQLModel, create_engine
+from sqlmodel import SQLModel 
+from sqlalchemy.pool import NullPool
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine
 from src.core.config import settings
-from src.core.models import YTVideo, Thread, Message  # Import models to register them
+from src.core.config import settings
 
-DB_URL = f"sqlite+aiosqlite:///{settings.APP_DB_PATH}"
+DB_URL = f"postgresql+psycopg://{settings.DB_USER}:{settings.DB_PASSWORD}@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_DBNAME}"
 
-engine = create_async_engine(DB_URL, echo=True)
+engine = create_async_engine(DB_URL, echo=True, poolclass=NullPool)
 
 async def init_db():
     async with engine.begin() as conn:

@@ -1,11 +1,14 @@
 from typing import AsyncGenerator
 from fastapi import Request
+from langchain_pinecone import PineconeVectorStore
 from sqlmodel.ext.asyncio.session import AsyncSession
 import chromadb
 from langchain_chroma import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from src.core.config import settings
 from src.core.database import engine
+from pinecone import Pinecone
+import os
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency for getting a database session."""
@@ -27,13 +30,19 @@ def get_embeddings():
 def get_vector_store():
     """Dependency for getting the Vector Store."""
 
-    chroma_client = chromadb.PersistentClient(path=settings.CHROMA_DB_PATH)
+    pc = Pinecone(api_key=os.environ.get("PINECONE_API_KEY"))
+    index = pc.Index(settings.PINECONE_INDEX_NAME)
 
-    return Chroma(
-      client=chroma_client,
-      collection_name=settings.CHROMA_COLLECTION_NAME,
-      embedding_function=get_embeddings()
-    )
+    return PineconeVectorStore(index=index, embedding=get_embeddings())
+
+    # chroma_client = chromadb.PersistentClient(path=settings.CHROMA_DB_PATH)
+
+    # return Chroma(
+    #   client=chroma_client,
+    #   collection_name=settings.CHROMA_COLLECTION_NAME,
+    #   embedding_function=get_embeddings()
+    # )
+
 
 def get_agent(request: Request):
     """Dependency for getting the LangGraph agent tied to the app."""

@@ -79,6 +79,7 @@ class Settings:
 
         # RAG Configuration
         self.CHROMA_DB_PATH = os.getenv("CHROMA_DB_PATH", "./.chroma")
+        self.PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "ask-youtube")
         self.RETRIVER_STORE_PATH = os.getenv("RETRIVER_STORE_PATH", "./.retriever_store")
         self.CHROMA_COLLECTION_NAME = os.getenv("CHROMA_COLLECTION_NAME", "youtube_videos")
         self.FAST_LLM_MODEL = os.getenv("FAST_LLM_MODEL", "gemini-2.5-flash")
@@ -98,6 +99,11 @@ class Settings:
         self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
         self.LOG_FORMAT = os.getenv("LOG_FORMAT", "json")  # "json" or "console"
 
+        self.DB_USER = os.getenv("DB_USER")
+        self.DB_PASSWORD = os.getenv("DB_PASSWORD")
+        self.DB_HOST = os.getenv("DB_HOST")  # "json" or "console"
+        self.DB_PORT = os.getenv("DB_PORT")  # "json" or "console"
+        self.DB_DBNAME = os.getenv("DB_DBNAME")  # "json" or "console"
 
         # Rate limit endpoints defaults
         default_endpoints = {
