@@ -75,7 +75,7 @@ function MessageBubbleComponent({
               {isUser ? (
                 <p className="whitespace-pre-wrap">{message.content}</p>
               ) : (
-                <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+                <div className="prose dark:prose-invert max-w-none break-words">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm, remarkBreaks]}
                     components={{
@@ -91,7 +91,7 @@ function MessageBubbleComponent({
                   )}
 
                   {/* Citations */}
-                  {message.metadata?.citations && Array.isArray(message.metadata.citations) && (
+                  {Array.isArray(message.metadata?.citations) && message.metadata.citations.length > 0 && (
                     <div className="mt-4 pt-2 border-t border-muted-foreground/20">
                       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
                         Sources
@@ -115,7 +115,7 @@ function MessageBubbleComponent({
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-    </div>
+    </div >
   );
 }
 
