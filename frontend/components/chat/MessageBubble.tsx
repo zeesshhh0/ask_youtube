@@ -36,7 +36,10 @@ function MessageBubbleComponent({
 
   return (
     <div
-      className={cn("flex gap-3", isUser ? "flex-row-reverse" : "flex-row")}
+      className={cn(
+        "flex gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300",
+        isUser ? "flex-row-reverse" : "flex-row"
+      )}
     >
       {/* Avatar */}
       {showAvatar && (
@@ -61,12 +64,12 @@ function MessageBubbleComponent({
           <TooltipTrigger asChild>
             <div
               className={cn(
-                "max-w-[80%] rounded-2xl px-4 py-2",
+                "max-w-[80%] rounded-sm px-4 py-2",
                 isUser
-                  ? "rounded-tr-sm bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground"
                   : isError
-                    ? "rounded-tl-sm bg-destructive/10 border border-destructive/20 text-destructive"
-                    : "rounded-tl-sm bg-muted text-foreground"
+                    ? "bg-destructive/10 border border-destructive/20 text-destructive"
+                    : "bg-muted text-foreground"
               )}
             >
               {isUser ? (

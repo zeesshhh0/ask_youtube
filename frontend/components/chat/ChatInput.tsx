@@ -99,7 +99,7 @@ export function ChatInput({
             disabled={disabled || isSubmitting}
             rows={2}
             className={cn(
-              "min-h-[64px] max-h-[400px] resize-none pr-12 py-3 text-base md:text-sm rounded-xl shadow-sm",
+              "min-h-[64px] max-h-[400px] resize-none pr-12 py-3 text-base md:text-sm rounded-sm shadow-sm",
               isOverLimit && "border-destructive focus-visible:ring-destructive"
             )}
             aria-label="Message input"

@@ -100,16 +100,39 @@ export default function ThreadPage() {
         <div className="border-b p-4">
           <Skeleton className="h-6 w-48" />
         </div>
-        <div className="flex-1 p-4 space-y-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="flex gap-3">
-              <Skeleton className="h-8 w-8 rounded-full" />
-              <div className="space-y-2 flex-1">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
+        <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+          <div className="max-w-3xl mx-auto w-full space-y-4">
+            {[
+              { isUser: false, width1: "w-3/4", width2: "w-1/2" },
+              { isUser: true, width1: "w-full", width2: "w-5/6" },
+              { isUser: false, width1: "w-4/5", width2: "w-2/3" },
+              { isUser: true, width1: "w-full", width2: "w-5/6" },
+              { isUser: false, width1: "w-4/5", width2: "w-2/3" },
+            ].map((bubble, i) => (
+              <div
+                key={i}
+                className={`flex gap-3 ${bubble.isUser ? "flex-row-reverse" : "flex-row"
+                  }`}
+              >
+                <Skeleton className="h-8 w-8 rounded-full shrink-0" />
+                <div
+                  className={`w-[75%] sm:w-[60%] flex flex-col gap-2 px-4 py-3 rounded-sm ${bubble.isUser
+                    ? "bg-primary/40 items-end"
+                    : "bg-muted/40 text-foreground items-start"
+                    }`}
+                >
+                  <Skeleton
+                    className={`h-4 ${bubble.width1} ${bubble.isUser ? "bg-primary-foreground/20" : "bg-foreground/20"
+                      }`}
+                  />
+                  <Skeleton
+                    className={`h-4 ${bubble.width2} ${bubble.isUser ? "bg-primary-foreground/20" : "bg-foreground/20"
+                      }`}
+                  />
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -124,7 +147,7 @@ export default function ThreadPage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
+    <div className="flex-1 flex flex-col min-h-0 animate-in fade-in duration-500">
       <ChatContainer
         key={thread.thread_id}
         thread={thread}

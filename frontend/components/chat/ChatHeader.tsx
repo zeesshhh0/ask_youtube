@@ -13,7 +13,7 @@ export function ChatHeader({ title, videoId }: ChatHeaderProps) {
   const { toggleSidebar } = useChatContext();
 
   return (
-    <header className="flex items-center gap-3 border-b px-4 py-3 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="flex h-14 items-center gap-3 border-b px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shrink-0">
       <Button
         variant="ghost"
         size="icon"

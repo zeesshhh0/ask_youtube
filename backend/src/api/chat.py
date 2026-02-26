@@ -189,7 +189,12 @@ async def send_message(
                 )
                 await crud_message.create_message(session=bg_session, message=ai_message)
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream", background=BackgroundTask(save_streamed_message))
+    return StreamingResponse(
+        event_generator(), 
+        media_type="text/event-stream", 
+        background=BackgroundTask(save_streamed_message
+        )
+    )
 
 
 # ──────────────────────────────────────────────

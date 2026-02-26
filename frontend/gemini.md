@@ -1,8 +1,8 @@
-# Explainium Frontend Agent Specification
+# Ask Youtube Frontend Agent Specification
 
 ## 1. Project Overview
 
-**Name:** Explainium UI  
+**Name:** Ask Youtube UI  
 **Type:** Educational Chat Interface for YouTube Videos  
 **Framework:** Next.js 14+ (App Router)  
 **Goal:** Create a "Chat with Video" interface where users can interact with educational YouTube content through an AI-powered conversational experience.  

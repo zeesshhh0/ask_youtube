@@ -21,7 +21,7 @@ export function Sidebar() {
       <Sheet open={isSidebarOpen} onOpenChange={toggleSidebar}>
         <SheetContent side="left" className="w-[280px] p-0 flex flex-col">
           <SheetHeader className="p-4 pb-0">
-            <SheetTitle className="text-left">Explainium</SheetTitle>
+            <SheetTitle className="text-left">Ask Youtube</SheetTitle>
           </SheetHeader>
 
           <div className="p-4">
@@ -40,8 +40,8 @@ export function Sidebar() {
 
       {/* Desktop sidebar (persistent) */}
       <aside className="hidden md:flex w-[280px] border-r flex-col bg-muted/30">
-        <div className="p-4 border-b">
-          <h1 className="font-semibold text-lg">Explainium</h1>
+        <div className="flex h-14 items-center px-4 border-b">
+          <h1 className="font-semibold text-lg">Ask Youtube</h1>
         </div>
 
         <div className="p-4">

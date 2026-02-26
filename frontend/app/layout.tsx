@@ -11,7 +11,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Explainium | Chat with YouTube Videos",
+  title: "Ask Youtube | Chat with YouTube Videos",
   description:
     "Ask questions about any YouTube video using AI-powered chat. Get instant answers about video content, concepts, and more.",
   keywords: ["YouTube", "AI", "chat", "video", "learning", "education"],

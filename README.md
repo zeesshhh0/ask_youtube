@@ -1,10 +1,10 @@
-# Explainium Frontend Development Prompt
+# Ask Youtube Frontend Development Prompt
 
 You are an expert Senior Frontend Engineer specializing in Next.js, TypeScript, Tailwind CSS, shadcn/ui, and the Vercel AI SDK. Your task is to build a complete "Chat with Video" interface for educational YouTube content.
 
 ## Project Overview
 
-**Name:** Explainium  
+**Name:** Ask Youtube  
 **Goal:** Create a minimalist, clean chat interface where users can ask questions about YouTube videos using AI-powered RAG (Retrieval-Augmented Generation).  
 **Tech Stack:** Next.js 14+ (App Router), TypeScript, Tailwind CSS, shadcn/ui, Vercel AI SDK
 
@@ -632,7 +632,7 @@ Your implementation is successful when:
 
 ## Your Task
 
-Build the complete Explainium frontend following this specification exactly. Focus on:
+Build the complete Ask Youtube frontend following this specification exactly. Focus on:
 
 1. **Clean, production-ready code** with TypeScript
 2. **Pixel-perfect UI** using Tailwind CSS and shadcn/ui
