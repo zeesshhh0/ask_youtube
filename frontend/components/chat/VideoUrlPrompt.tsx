@@ -16,7 +16,7 @@ interface VideoUrlPromptProps {
 
 const loadingMessages = [
   "Fetching transcript...",
-  "Generating embeddings...",
+  "Processing transcripts...",
   "Preparing chat...",
 ];
 
@@ -152,7 +152,7 @@ export function VideoUrlPrompt({
 
           {/* Hint */}
           <p className="text-center text-xs text-muted-foreground">
-            Works best with videos that have captions/transcripts available
+            Works best with videos that have english captions/transcripts available
           </p>
         </CardContent>
       </Card>

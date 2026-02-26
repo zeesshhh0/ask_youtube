@@ -38,27 +38,41 @@ class YouTubeTools:
         hostname = parsed_url.hostname
         print(f"[{datetime.now()}] Parsed hostname: {hostname}")
 
+        video_id = None
         if hostname == "youtu.be":
             video_id = parsed_url.path[1:]
             print(f"[{datetime.now()}] Extracted video ID from youtu.be: {video_id}")
-            return video_id
-        if hostname in ("www.youtube.com", "youtube.com"):
+        elif hostname in ("www.youtube.com", "youtube.com"):
             if parsed_url.path == "/watch":
                 query_params = parse_qs(parsed_url.query)
                 video_id = query_params.get("v", [None])[0]
                 print(f"[{datetime.now()}] Extracted video ID from watch URL: {video_id}")
-                return video_id
-            if parsed_url.path.startswith("/embed/"):
+            elif parsed_url.path.startswith("/embed/"):
                 video_id = parsed_url.path.split("/")[2]
                 print(f"[{datetime.now()}] Extracted video ID from embed URL: {video_id}")
-                return video_id
-            if parsed_url.path.startswith("/v/"):
+            elif parsed_url.path.startswith("/v/"):
                 video_id = parsed_url.path.split("/")[2]
                 print(f"[{datetime.now()}] Extracted video ID from /v/ URL: {video_id}")
-                return video_id
 
-        print(f"[{datetime.now()}] ERROR: Could not extract video ID from URL: {url}")
-        return None
+        if not video_id:
+            print(f"[{datetime.now()}] ERROR: Could not extract video ID from URL: {url}")
+            raise HTTPException(status_code=400, detail="Invalid YouTube URL format")
+
+        try:
+            oembed_url = f"https://www.youtube.com/oembed?format=json&url=https://www.youtube.com/watch?v={video_id}"
+            from urllib.request import urlopen
+            from urllib.error import HTTPError
+            with urlopen(oembed_url) as response:
+                pass
+        except HTTPError as e:
+            if e.code in (400, 401, 403, 404):
+                print(f"[{datetime.now()}] ERROR: Video does not exist or is unavailable: {video_id}")
+                raise HTTPException(status_code=400, detail="Video does not exist or is unavailable")
+            print(f"[{datetime.now()}] WARNING: Could not verify video existence: {e}")
+        except Exception as e:
+            print(f"[{datetime.now()}] WARNING: Could not verify video existence: {e}")
+
+        return video_id
 
     @staticmethod
     def get_video_data(url: str) -> dict:
@@ -75,6 +89,8 @@ class YouTubeTools:
                 print(f"[{datetime.now()}] ERROR: Invalid YouTube URL: {url}")
                 raise HTTPException(status_code=400, detail="Invalid YouTube URL")
             print(f"[{datetime.now()}] Video ID extracted: {video_id}")
+        except HTTPException:
+            raise
         except Exception as e:
             print(f"[{datetime.now()}] ERROR: Exception while getting video ID: {str(e)}")
             raise HTTPException(status_code=400, detail="Error getting video ID from URL")
@@ -106,6 +122,8 @@ class YouTubeTools:
                 }
                 print(f"[{datetime.now()}] Video data retrieved: Title='{clean_data.get('title')}', Author='{clean_data.get('author_name')}'")
                 return clean_data
+        except HTTPException:
+            raise
         except Exception as e:
             print(f"[{datetime.now()}] ERROR: Exception while getting video data: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error getting video data: {str(e)}")
@@ -138,6 +156,8 @@ class YouTubeTools:
             
             print(f"[{datetime.now()}] WARNING: Could not find lengthSeconds in HTML")
             return None
+        except HTTPException:
+            raise
         except Exception as e:
             print(f"[{datetime.now()}] ERROR: Exception while getting video duration: {str(e)}")
             return None
@@ -191,6 +211,8 @@ class YouTubeTools:
                 print(f"[{datetime.now()}] ERROR: Invalid YouTube URL: {url}")
                 raise HTTPException(status_code=400, detail="Invalid YouTube URL")
             print(f"[{datetime.now()}] Video ID extracted: {video_id}")
+        except HTTPException:
+            raise
         except Exception as e:
             print(f"[{datetime.now()}] ERROR: Exception while getting video ID: {str(e)}")
             raise HTTPException(status_code=400, detail="Error getting video ID from URL")
@@ -217,6 +239,8 @@ class YouTubeTools:
 
             print(f"[{datetime.now()}] WARNING: No captions found for video")
             return "No captions found for video"
+        except HTTPException:
+            raise
         except Exception as e:
             print(f"[{datetime.now()}] ERROR: Exception while getting captions: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error getting captions for video: {str(e)}")
@@ -236,6 +260,8 @@ class YouTubeTools:
                 print(f"[{datetime.now()}] ERROR: Invalid YouTube URL: {url}")
                 raise HTTPException(status_code=400, detail="Invalid YouTube URL")
             print(f"[{datetime.now()}] Video ID extracted: {video_id}")
+        except HTTPException:
+            raise
         except Exception as e:
             print(f"[{datetime.now()}] ERROR: Exception while getting video ID: {str(e)}")
             raise HTTPException(status_code=400, detail="Error getting video ID from URL")
@@ -243,10 +269,13 @@ class YouTubeTools:
         try:
             print(f"[{datetime.now()}] Fetching transcript in background thread...")
 
-            
             fetched_transcript, available_languages = await asyncio.to_thread(
-                YouTubeTools._get_transcript_with_fallback, video_id, languages
+                YouTubeTools._get_transcript_with_fallback, video_id, ["en"]
             )
+
+            if not any(lang.startswith("en") for lang in available_languages):
+                print(f"[{datetime.now()}] ERROR: English transcript not available. Found: {available_languages}")
+                raise HTTPException(status_code=422, detail="Only English transcripts are supported")
 
             print(f"[{datetime.now()}] Available transcript languages: {available_languages}")
             print(f"[{datetime.now()}] Transcript fetched successfully")
@@ -265,6 +294,8 @@ class YouTubeTools:
             print(f"[{datetime.now()}] Generated {len(timestamps)} timestamps")
             timestamps = ", ".join(timestamps)
             return timestamps
+        except HTTPException:
+            raise
         except Exception as e:
             print(f"[{datetime.now()}] ERROR: Exception while generating timestamps: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error generating timestamps: {str(e)}")
@@ -284,6 +315,8 @@ class YouTubeTools:
                 print(f"[{datetime.now()}] ERROR: Invalid YouTube URL: {url}")
                 raise HTTPException(status_code=400, detail="Invalid YouTube URL")
             print(f"[{datetime.now()}] Video ID extracted: {video_id}")
+        except HTTPException:
+            raise
         except Exception as e:
             print(f"[{datetime.now()}] ERROR: Exception while getting video ID: {str(e)}")
             raise HTTPException(status_code=400, detail="Error getting video ID from URL")
@@ -312,6 +345,8 @@ class YouTubeTools:
             print(f"[{datetime.now()}] Found {len(languages_info)} available transcript languages")
             return languages_info
 
+        except HTTPException:
+            raise
         except Exception as e:
             print(f"[{datetime.now()}] ERROR: Exception while listing transcript languages: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Error listing transcript languages: {str(e)}")
