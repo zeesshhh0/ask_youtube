@@ -14,4 +14,3 @@ tests/
 *.sqlite3
 .pytest_cache/
 .coverage
-htmlcov/
