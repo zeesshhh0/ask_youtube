@@ -3,7 +3,7 @@ from langchain.tools import tool
 from langchain.agents import create_agent
 from src.api.deps import get_llm, get_vector_store
 from langchain.tools import ToolRuntime
-from langchain.agents.middleware import dynamic_prompt, ModelRequest, AgentState
+from langchain.agents.middleware import ClearToolUsesEdit, ContextEditingMiddleware, ModelRetryMiddleware, dynamic_prompt, ModelRequest, AgentState
 from langsmith import Client
 from langchain_classic.prompts import BaseChatPromptTemplate
 from collections import defaultdict
@@ -36,7 +36,7 @@ def inject_video_summaries(request: ModelRequest) -> str:
     
     for id, vid in enumerate(active_videos):
         # Get summary or fallback text
-        video_context_str += f"- **Video** - Video Number: {id+1}\n Video Title: {vid['title']}\n Video Summary: {vid['summary']}\n"
+        video_context_str += f"- **Video**\n Video Title: {vid['title']}\n Video Summary: {vid['summary']}\n"
     
     return base_prompt + video_context_str
 
@@ -81,10 +81,27 @@ def retrieve_context(query: str, runtime: ToolRuntime[YTAgentState]):
     return serialized, retrieved_docs
 
 
+
+
 agent = create_agent(
     model=get_llm(),
     tools=[retrieve_context],
-    middleware=[inject_video_summaries],
+    middleware=[
+        inject_video_summaries,
+        ModelRetryMiddleware(
+            max_retries=3,
+            backoff_factor=2.0,
+            initial_delay=1.0,
+            on_failure='error',
+        ),
+        ContextEditingMiddleware(
+            edits=[
+                ClearToolUsesEdit(
+                    trigger=10000,
+                    keep=2,
+                ),
+            ],
+        ),
+    ],
     state_schema=YTAgentState,
-    # debug=True
 )

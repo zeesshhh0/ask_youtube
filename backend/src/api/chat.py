@@ -128,73 +128,87 @@ async def send_message(
 
     response_context = {'content': "" }
 
-    thread = await crud_thread.get_thread_by_id(session, thread_id)
-    if not thread:
-        raise HTTPException(status_code=404, detail="Thread not found")
-    
-    ytvideo = await crud_video.get_video_by_id(session, thread.video_id)
-    if not ytvideo:
-        raise HTTPException(status_code=404, detail="video not found")
-    
-    
-    user_message = Message(
-        thread_id=thread_id,
-        content=message.content,
-        sender="human",
+    try:
+        thread = await crud_thread.get_thread_by_id(session, thread_id)
+        if not thread:
+            raise HTTPException(status_code=404, detail="Thread not found")
+        
+        ytvideo = await crud_video.get_video_by_id(session, thread.video_id)
+        if not ytvideo:
+            raise HTTPException(status_code=404, detail="video not found")
+        
+        user_message = Message(
+            thread_id=thread_id,
+            content=message.content,
+            sender="human",
         )
-    
-    await crud_message.create_message(session, user_message)
+        
+        await crud_message.create_message(session, user_message)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error initializing message: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
     
     async def event_generator():
-        config = {
-            "configurable": {
-                "thread_id": thread_id,
+        try:
+            config = {
+                "configurable": {
+                    "thread_id": thread_id,
+                }
             }
-        }
-        
-        video = YoutubeVideo(
-        video_id= thread.video_id,
-        title= ytvideo.title,
-        summary= ytvideo.summary
-        )
-
-        input: YTAgentState = YTAgentState(
-            messages=[HumanMessage(content= message.content)],
-            videos=[video]
+            
+            video = YoutubeVideo(
+                video_id=thread.video_id,
+                title=ytvideo.title,
+                summary=ytvideo.summary
             )
 
-        async for event in agent.astream(
-            input = input,
-            config=config,
-            stream_mode="messages"
-        ):
-            msg = event[0]
-            
-            if isinstance(msg, AIMessageChunk):
-                content = msg.content
-                response_context['content'] += content # type: ignore
-                if content:
-                    yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
+            input_state: YTAgentState = YTAgentState(
+                messages=[HumanMessage(content=message.content)],
+                videos=[video]
+            )
 
-        yield f"data: {json.dumps({'type': 'end'})}\n\n"
+            async for event in agent.astream(
+                input=input_state,
+                config=config,
+                stream_mode="messages"
+            ):
+                msg = event[0]
+                
+                if isinstance(msg, AIMessageChunk):
+                    content = msg.content
+                    response_context['content'] += content # type: ignore
+                    if content:
+                        yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
 
+            yield f"data: {json.dumps({'type': 'end'})}\n\n"
+        except Exception as e:
+            logger.error(f"Error during SSE generation: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'error': 'An error occurred during message generation.'})}\n\n"
 
     async def save_streamed_message():
-        if response_context['content']:
-            async with AsyncSession(engine, expire_on_commit=False) as bg_session:
-                ai_message = Message(
-                    thread_id=thread_id,
-                    content=response_context['content'],
-                    sender="ai",
-                )
-                await crud_message.create_message(session=bg_session, message=ai_message)
+        try:
+            if response_context['content']:
+                async with AsyncSession(engine, expire_on_commit=False) as bg_session:
+                    ai_message = Message(
+                        thread_id=thread_id,
+                        content=response_context['content'],
+                        sender="ai",
+                    )
+                    await crud_message.create_message(session=bg_session, message=ai_message)
+        except Exception as e:
+            logger.error(f"Error saving streamed message: {e}")
 
-    return StreamingResponse(
-        event_generator(), 
-        media_type="text/event-stream", 
-        background=BackgroundTask(save_streamed_message
+    try:
+        return StreamingResponse(
+            event_generator(), 
+            media_type="text/event-stream", 
+            background=BackgroundTask(save_streamed_message)
         )
-    )
+    except Exception as e:
+        logger.error(f"Error establishing stream: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ──────────────────────────────────────────────
