@@ -19,8 +19,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(debug=True, lifespan=lifespan)
 
 origins = [
-#    "https://Ask Youtube.vercel.app",
-   "*"
+   "https://ask-youtubee.vercel.app",
 ]
 
 app.add_middleware(

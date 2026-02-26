@@ -1,54 +1,25 @@
-# syntax=docker/dockerfile:1
+FROM python:3.13-slim
 
-# ---- Builder Stage ----
-# This stage installs Python dependencies into a virtual environment.
-ARG PYTHON_VERSION=3.13.3
-FROM python:${PYTHON_VERSION}-slim AS builder
+# Copy uv from the official image
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Prevent writing .pyc files and disable output buffering
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-# Create a virtual environment to isolate dependencies
-ENV VENV_PATH=/opt/venv
-RUN python -m venv $VENV_PATH
-ENV PATH="$VENV_PATH/bin:$PATH"
-
-# Install dependencies from requirements.txt
+# Set working directory
 WORKDIR /app
-COPY requirements.txt ./
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
 
-# ---- Final Stage ----
-# This stage creates the final, lean production image.
-FROM python:${PYTHON_VERSION}-slim AS final
+# Optimization: Copy dependency files first to leverage Docker cache
+COPY pyproject.toml uv.lock ./
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV VENV_PATH=/opt/venv
-ENV PATH="$VENV_PATH/bin:$PATH"
+# Install dependencies using uv
+# --frozen ensures we use the exact versions in uv.lock
+# --no-dev skips installing development dependencies
+RUN uv sync --frozen --no-dev --no-install-project
 
-# Create a dedicated, non-privileged user
-WORKDIR /app
-ARG UID=10001
-RUN adduser \
-    --disabled-password \
-    --gecos "" \
-    --shell "/sbin/nologin" \
-    --uid "${UID}" \
-    appuser
+# Copy the rest of the application
+COPY . /app
 
-# Copy the virtual environment from the builder stage
-COPY --from=builder ${VENV_PATH} ${VENV_PATH}
+# Install the project itself
+RUN uv sync --frozen --no-dev
 
-# Copy application code and set ownership in one step
-# Use a .dockerignore file to exclude unnecessary files/folders
-COPY --chown=appuser:appuser . .
-
-# Switch to the non-privileged user
-USER appuser
-
-# Expose the port and define the runtime command
-EXPOSE 8080
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Ensure uvicorn runs on the port required by Google Cloud Run (default: 8080)
+# Cloud Run automatically sets the PORT environment variable
+CMD ["sh", "-c", "uv run uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8080}"]

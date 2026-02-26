@@ -30,3 +30,5 @@ evals/reports/
 .chroma
 .DS_Store
 checkpoints*
+
+**\.DS_Store
