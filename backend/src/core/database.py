@@ -4,9 +4,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from src.core.config import settings
 
-DB_URL = f"postgresql+psycopg://{settings.DB_USER}:{settings.DB_PASSWORD}@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_DBNAME}"
-
-engine = create_async_engine(DB_URL, echo=True, poolclass=NullPool)
+engine = create_async_engine(settings.DB_URL, echo=True, poolclass=NullPool)
 
 async def init_db():
     async with engine.begin() as conn:

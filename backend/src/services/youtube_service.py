@@ -3,7 +3,6 @@ from fastapi import HTTPException
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from langchain_classic.text_splitter import RecursiveCharacterTextSplitter
-
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.embeddings import Embeddings
 from langchain_core.vectorstores import VectorStore
@@ -59,7 +58,7 @@ async def ingest_youtube_video(
     parent_splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=300)
     child_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
 
-    parent_docs = parent_splitter.create_documents([transcript])
+    parent_docs = (doc for doc in parent_splitter.create_documents([transcript]))
 
     ids = []
     metadatas = []
@@ -126,13 +125,19 @@ async def ingest_youtube_video(
     global_summary_res = await llm.ainvoke(global_summary_prompt)
     video_global_summary = global_summary_res.content
 
-    docs_embeddings = embeddings.embed_documents(texts)
-    vector_store.add_texts(
-        ids=ids,
-        texts=texts,
-        embeddings=docs_embeddings,
-        metadatas=metadatas,
-    )
+    batch_size = 100
+    for i in range(0, len(texts), batch_size):
+        batch_ids = ids[i : i + batch_size]
+        batch_texts = texts[i : i + batch_size]
+        batch_metadatas = metadatas[i : i + batch_size]
+
+        batch_embeddings = await embeddings.aembed_documents(batch_texts)
+        await vector_store.aadd_texts(
+            ids=batch_ids,
+            texts=batch_texts,
+            embeddings=batch_embeddings,
+            metadatas=batch_metadatas,
+        )
 
     # Insert video into DB
     video = YTVideo(

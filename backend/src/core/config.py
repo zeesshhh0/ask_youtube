@@ -70,15 +70,12 @@ class Settings:
         self.DEBUG = os.getenv("DEBUG", "false").lower() in ("true", "1", "t", "yes")
 
         # RAG Configuration
-        self.CHROMA_DB_PATH = os.getenv("CHROMA_DB_PATH", "./.chroma")
         self.PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "ask-youtube")
         self.FAST_LLM_MODEL = os.getenv("FAST_LLM_MODEL", "gemini-2.5-flash")
         self.FASTEST_LLM_MODEL = os.getenv("FASTEST_LLM_MODEL", "gemini-2.5-flash-lite")
         self.SMART_LLM_MODEL = os.getenv("SMART_LLM_MODEL", "gemini-2.5-pro")
         self.EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
         self.OUTPUT_DIMENSIONALITY = os.getenv("OUTPUT_DIMENSIONALITY", 768)
-        self.CHECKPOINT_DB_PATH = os.getenv("CHECKPOINT_DB_PATH", "checkpoints.db")
-        self.APP_DB_PATH = os.getenv("APP_DB_PATH", "app.db")
 
         # JWT Configuration
         self.JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "")
@@ -88,13 +85,14 @@ class Settings:
         # Logging Configuration
         self.LOG_DIR = Path(os.getenv("LOG_DIR", "logs"))
         self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-        self.LOG_FORMAT = os.getenv("LOG_FORMAT", "json")  # "json" or "console"
+        self.LOG_FORMAT = os.getenv("LOG_FORMAT", "json")  
 
         self.DB_USER = os.getenv("DB_USER")
         self.DB_PASSWORD = os.getenv("DB_PASSWORD")
-        self.DB_HOST = os.getenv("DB_HOST")  # "json" or "console"
-        self.DB_PORT = os.getenv("DB_PORT")  # "json" or "console"
-        self.DB_DBNAME = os.getenv("DB_DBNAME")  # "json" or "console"
+        self.DB_HOST = os.getenv("DB_HOST")  
+        self.DB_PORT = os.getenv("DB_PORT")  
+        self.DB_DBNAME = os.getenv("DB_DBNAME")  
+        self.DB_URL = os.getenv("DB_URL", f"postgresql+psycopg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_DBNAME}")
 
         # Rate limit endpoints defaults
         default_endpoints = {
